@@ -1,0 +1,20 @@
+---
+// DIRECTORY-WIDE ASSISTANT (GHL Conversation AI).
+// Loads on the home page, category/search/add-business pages, and FREE listing pages.
+// Suppressed on Featured listing pages (see [slug].astro routing).
+// Add your GHL widget id to .env as PUBLIC_GHL_WIDGET_ID once you have it.
+const widgetId = import.meta.env.PUBLIC_GHL_WIDGET_ID;
+---
+
+{widgetId ? (
+  <script
+    src="https://widgets.leadconnectorhq.com/loader.js"
+    data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js"
+    data-widget-id={widgetId}
+    defer
+  ></script>
+) : (
+  <div class="fixed bottom-5 right-5 z-50 rounded-full bg-slate-900 px-4 py-3 text-sm text-white shadow-lg">
+    💬 Directory assistant
+  </div>
+)}

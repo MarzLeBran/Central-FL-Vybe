@@ -1,0 +1,32 @@
+---
+// PER-LISTING BUSINESS AGENT (your custom LLM widget).
+// Loads ONLY on Featured listing pages. Never appears alongside the directory-wide widget.
+//
+// Today: a working placeholder that proves the routing (it mounts only on Featured pages).
+// Layer 5: wire the input to POST /api/agent  { slug, message } — that endpoint builds a
+// system prompt from this business's `aiContext`, answers as the business, and captures
+// leads, routing them per agencyClient / clientLocationId.
+
+import type { Listing } from "../types/listing";
+const { listing } = Astro.props as { listing: Listing };
+---
+
+<div
+  id="listing-agent"
+  data-slug={listing.slug}
+  class="fixed bottom-5 right-5 z-50 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl"
+>
+  <div class="flex items-center gap-2 rounded-t-2xl bg-slate-900 px-4 py-3 text-white">
+    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+    <span class="text-sm font-medium">Ask {listing.businessName}</span>
+  </div>
+  <div class="p-4">
+    <p class="text-sm text-slate-600">
+      Hi! I'm the assistant for <strong>{listing.businessName}</strong> — ask me about our
+      services, hours, or location.
+    </p>
+    <p class="mt-3 text-xs text-slate-400">
+      (Wired to POST /api/agent in Layer 5 — this business agent only shows on Featured listings.)
+    </p>
+  </div>
+</div>
