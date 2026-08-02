@@ -32,6 +32,7 @@ Create these on **Contacts**. The key is what matters; the label is yours.
 | `listing_slug` | Text | `slug` — URL key, must be unique |
 | `google_rating` | Number | `rating` |
 | `google_review_count` | Number | `reviewCount` |
+| `google_place_id` | Text | `placeId` — fill by hand per business (Google Business Profile → Share → the id in the URL, or the [Place ID Finder](https://developers.google.com/maps/documentation/places/web-service/place-id)). Leave blank on unpaid listings; `scripts/import-reviews.mjs` skips any paid listing without one. |
 | `image_urls` | Multi-line | `imageUrls` (newline- or comma-separated) |
 | `hours` | Multi-line | `hours` |
 | `social_links` | Multi-line | `socialLinks` (`instagram=https://…` per line) |
@@ -110,13 +111,23 @@ live directory until you review it in GHL and tag it `business` yourself.
 Both write the four `tcpa_*` fields from above on every submission, consented
 or not — recording that consent was *asked* matters as much as the answer.
 
-**⚠️ Before you flip `DATA_SOURCE=ghl`:** `directory.ts`'s *read* path
-(`mapContactToListing`) has a known unfixed bug — GHL's contact read responses
-only return `{id, value}` per custom field, never the `key` you set above. The
-write path above does not have this problem (GHL's write endpoints accept
-`key` directly), so submissions will work; but listings will read back empty
-until this is fixed. See the comment directly above `mapContactToListing` in
-`src/lib/directory.ts` for the two ways to fix it.
+**Fixed:** `directory.ts`'s *read* path (`mapContactToListing`) used to break
+against real GHL data — contact read responses only return `{id, value}` per
+custom field, never the `key` you set above. `fetchFromGHL()` now calls
+`GET /locations/:locationId/customFields` once per build, caches an id→key
+map, and `cf()` resolves through it. Nothing to do here; noted in case the
+history is confusing.
+
+## Layer 4 — the monetization path
+
+Two more custom fields matter here beyond `google_place_id` above:
+
+- `plan_tier` is what checkout upgrades. `src/lib/submissions.ts`'s
+  `applyPlanUpgrade()` PUTs it directly — same pattern as the claim/add-business
+  writes, key-addressed so the read-path fix above doesn't affect it.
+- See [`stripe-checkout.md`](stripe-checkout.md) for the Stripe env vars and
+  webhook setup, and the Google Reviews section of
+  [`google-apis.md`](google-apis.md) for `scripts/import-reviews.mjs`.
 
 ## Done when
 

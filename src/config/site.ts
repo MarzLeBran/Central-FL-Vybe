@@ -173,9 +173,10 @@ export const site = {
       price: "$250",
       period: "per year",
       blurb: "Stand out from the crowd and turn views into real customers.",
-      // Upgrading presupposes an already-claimed listing, and there is no
-      // checkout yet (Stripe wiring is Layer 4). Send them to find/claim their
-      // listing first rather than invent a fake upgrade flow.
+      // Upgrading presupposes an already-claimed listing — checkout (Layer 4)
+      // lives on the listing's own page (business/[slug].astro), not here.
+      // Send visitors to find/claim their listing first rather than skip
+      // straight to a plan with no listing in scope.
       cta: { label: "Find your listing", href: "/listings" },
       hue: "sun",
       highlight: true,

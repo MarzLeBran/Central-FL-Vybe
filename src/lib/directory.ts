@@ -57,42 +57,60 @@ async function fetchFromGHL(): Promise<Listing[]> {
   const token = import.meta.env.GHL_PIT_TOKEN;
   const locationId = import.meta.env.GHL_LOCATION_ID;
 
-  const res = await fetch("https://services.leadconnectorhq.com/contacts/search", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Version: "2021-07-28",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      locationId,
-      pageLimit: 100,
-      filters: [{ field: "tags", operator: "contains", value: "business" }],
+  const [res, keyMap] = await Promise.all([
+    fetch("https://services.leadconnectorhq.com/contacts/search", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Version: "2021-07-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        locationId,
+        pageLimit: 100,
+        filters: [{ field: "tags", operator: "contains", value: "business" }],
+      }),
     }),
-  });
+    getCustomFieldKeyMap(token, locationId),
+  ]);
 
   if (!res.ok) throw new Error(`GHL fetch failed: ${res.status}`);
   const data = await res.json();
-  return (data.contacts ?? []).map(mapContactToListing);
+  return (data.contacts ?? []).map((c: any) => mapContactToListing(c, keyMap));
+}
+
+// Resolves GHL's per-field `id` back to the human `key` (e.g. "business_name")
+// set in Layer 0. Needed because contact read responses (GET/search) only
+// return `{ id, value }` per custom field — the key is write-only. One call per
+// build, cached in-module: field definitions don't change mid-build.
+let customFieldKeyMapPromise: Promise<Map<string, string>> | null = null;
+
+function getCustomFieldKeyMap(token: string, locationId: string): Promise<Map<string, string>> {
+  if (!customFieldKeyMapPromise) {
+    customFieldKeyMapPromise = (async () => {
+      const res = await fetch(
+        `https://services.leadconnectorhq.com/locations/${locationId}/customFields`,
+        { headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28" } }
+      );
+      if (!res.ok) throw new Error(`GHL customFields fetch failed: ${res.status}`);
+      const data = await res.json();
+      const map = new Map<string, string>();
+      for (const f of data.customFields ?? []) map.set(f.id, f.key ?? f.fieldKey);
+      return map;
+    })();
+  }
+  return customFieldKeyMapPromise;
 }
 
 // Maps one GHL contact -> our Listing. Fill the custom-field KEYS with the exact
 // keys you created in Layer 0 (GHL exposes them as an array on the contact).
-//
-// ⚠️ KNOWN GAP, not yet fixed: GHL's contact read responses (GET/search) only
-// return `{ id, value }` per custom field — the human-readable `key` you set in
-// Layer 0 (e.g. "business_name") is NOT included on read, only on write. So
-// `cf()`'s `f.key === key` branch below will never match against a real GHL
-// response; it only works today because DATA_SOURCE=mock reads mock JSON with
-// keys already spelled out. Before flipping DATA_SOURCE=ghl, this needs one of:
-//   (a) call GET /locations/:locationId/customFields once, cache an id->key
-//       map, and resolve `cf()` through it, or
-//   (b) hardcode the field ids you get from Layer 0 directly into this map.
-// The WRITE side (src/lib/submissions.ts) does not have this problem — GHL's
-// update/create endpoints accept `key` directly in the request body.
-function mapContactToListing(c: any): Listing {
-  const cf = (key: string) =>
-    (c.customFields ?? []).find((f: any) => f.id === key || f.key === key)?.value;
+function mapContactToListing(c: any, keyMap: Map<string, string>): Listing {
+  const cf = (key: string) => {
+    const field = (c.customFields ?? []).find(
+      (f: any) => f.key === key || keyMap.get(f.id) === key
+    );
+    return field?.value;
+  };
 
   return {
     id: c.id,
@@ -114,6 +132,7 @@ function mapContactToListing(c: any): Listing {
     aiContext: cf("ai_context"),
     agencyClient: String(cf("agency_client")).toLowerCase() === "true",
     clientLocationId: cf("client_location_id") || undefined,
+    placeId: cf("google_place_id") || undefined,
   };
 }
 

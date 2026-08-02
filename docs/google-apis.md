@@ -59,8 +59,26 @@ When Google reviews get wired up:
    `google_review_count` already exist as custom fields (see
    [ghl-layer-0.md](ghl-layer-0.md)), so golden rule 1 still holds.
 
+**Built:** [`scripts/import-reviews.mjs`](../scripts/import-reviews.mjs) — run
+it manually or on a cron/GitHub Action, never from `npm run build`:
+
+```
+npm run reviews                     # refresh anything stale (default: 7+ days)
+npm run reviews -- --max-age-days 14
+npm run reviews -- --force          # ignore the cache, refetch everything paid
+npm run reviews -- --dry            # print who'd be fetched, call nothing
+```
+
+It only fetches listings that are both paid **and** have a `placeId` set (the
+`google_place_id` custom field — admin-filled, see
+[ghl-layer-0.md](ghl-layer-0.md)); anything paid without one is skipped and
+logged rather than matched by name/address guesswork. Results are cached in
+`out/reviews-cache.json` (gitignored) with a `fetchedAt` timestamp — that
+cache, not the schedule you run it on, is what actually prevents re-billing a
+listing that was just refreshed.
+
 ## Keys
 
-None are needed today. When they are, they go in `.env` (already gitignored) and
-must stay server-side — a Places key in client JavaScript is a key anyone can
-spend your money with.
+`GOOGLE_PLACES_API_KEY` goes in `.env` (already gitignored) and must stay
+server-side — the import script is the only thing that reads it. A Places key
+in client JavaScript is a key anyone can spend your money with.

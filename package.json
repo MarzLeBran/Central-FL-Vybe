@@ -10,7 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "import": "node scripts/import-listings.mjs"
+    "import": "node scripts/import-listings.mjs",
+    "reviews": "node scripts/import-reviews.mjs"
   },
   "dependencies": {
     "@astrojs/vercel": "^11.0.4",

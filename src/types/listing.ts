@@ -41,6 +41,8 @@ export interface Listing {
   website?: string;
   rating?: number;            // google_rating
   reviewCount?: number;       // google_review_count
+  placeId?: string;           // google_place_id — required to fetch this business's
+                              // Google reviews (Layer 4); admin-filled, not scraped
   imageUrls: string[];        // image_urls (parsed)
   hours?: string;             // hours
   socialLinks?: Record<string, string>; // social_links (parsed)

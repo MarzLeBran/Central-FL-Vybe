@@ -43,6 +43,14 @@ const showsAgent = hasListingAgent(listing.planTier);
 const plan = site.plans.find((p) => p.id === listing.planTier);
 const hue = await hueClass(listing.category);
 
+// Next plan up, for the upgrade nudge below — undefined once already at the top.
+const nextPlan =
+  listing.planTier === "free"
+    ? site.plans.find((p) => p.id === "featured")
+    : listing.planTier === "featured"
+      ? site.plans.find((p) => p.id === "premium")
+      : undefined;
+
 const socials = Object.entries(listing.socialLinks ?? {});
 const [cover, ...gallery] = listing.imageUrls ?? [];
 const mapQuery = encodeURIComponent(`${listing.businessName}, ${listing.address}`);
@@ -203,6 +211,28 @@ if (listing.rating && listing.reviewCount) {
               class="mt-5 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper"
             >
               Claim this listing &rarr;
+            </a>
+          </div>
+        </div>
+      )
+    }
+
+    {
+      listing.claimStatus === "claimed" && nextPlan && (
+        <div class="mt-10">
+          <div class:list={[`hue-${nextPlan.hue}`, "hue-block px-6 py-8"]}>
+            <p class="meta font-bold">Own this listing? Do more with {nextPlan.name}</p>
+            <h2 class="font-display mt-1 text-2xl font-extrabold tracking-tight">
+              {nextPlan.blurb}
+            </h2>
+            <p class="mt-2 text-sub opacity-80">
+              {nextPlan.price} {nextPlan.period}.
+            </p>
+            <a
+              href={`/upgrade?t=${listing.id}&plan=${nextPlan.id}`}
+              class="mt-5 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper"
+            >
+              Upgrade to {nextPlan.name} &rarr;
             </a>
           </div>
         </div>

@@ -1,0 +1,38 @@
+---
+// Static on purpose — /api/checkout (mock mode) and Stripe's success_url
+// (live mode) both redirect here after a successful upgrade, and there is
+// nothing per-request to compute. The business name and plan come from a tiny
+// inline script reading ?business=/?plan= client-side, so the page itself
+// stays plain prerendered HTML — same pattern as /claim/thanks.
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+---
+
+<BaseLayout
+  title={`You're upgraded — ${site.name}`}
+  description="Your business listing has been upgraded."
+>
+  <section class="mx-auto max-w-xl px-5 py-20 text-center">
+    <p class="meta font-bold text-signal">Upgraded</p>
+    <h1 class="font-display mt-3 text-head">
+      You're all set<span data-business-suffix></span>
+    </h1>
+    <p class="mt-4 text-sub text-ink-soft" data-plan-note>
+      Your listing now has everything that plan includes. Changes can take a few
+      minutes to show up on the live page.
+    </p>
+    <a href="/listings" class="mt-8 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper">
+      Back to the directory &rarr;
+    </a>
+  </section>
+</BaseLayout>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const business = params.get("business");
+  if (business) {
+    const el = document.querySelector("[data-business-suffix]");
+    if (el) el.textContent = `, ${business}`;
+  }
+</script>

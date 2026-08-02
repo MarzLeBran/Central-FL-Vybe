@@ -1,0 +1,116 @@
+---
+// UPGRADE — confirm-then-checkout for an already-claimed listing.
+//
+// Server-rendered on demand for the same reason as /claim: needs a LIVE lookup
+// of the listing's current planTier/claimStatus, not a static snapshot, so a
+// listing upgraded a minute ago can't be charged twice and an unclaimed one
+// can't be upgraded out from under its real owner.
+//
+// Reached from the "Upgrade" CTA on a claimed listing's own page
+// (business/[slug].astro) — never from /pricing directly, since /pricing has
+// no listing in scope yet (see the comment on site.plans[].cta in site.ts).
+//
+// Same token model as /claim: `t` is the raw GHL contact id today, not an
+// unguessable token. Tighten alongside /claim's token before this is public.
+
+export const prerender = false;
+
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { site } from "../config/site";
+import { getListingById } from "../lib/directory";
+import { tierRank } from "../types/listing";
+import type { PlanTier } from "../types/listing";
+
+const listingId = Astro.url.searchParams.get("t") ?? "";
+const requestedPlan = Astro.url.searchParams.get("plan") ?? "";
+const errorCode = Astro.url.searchParams.get("error");
+const listing = await getListingById(listingId);
+
+const isUpgradeTier = (v: string): v is "featured" | "premium" =>
+  v === "featured" || v === "premium";
+const plan = isUpgradeTier(requestedPlan)
+  ? site.plans.find((p) => p.id === requestedPlan)
+  : undefined;
+
+const ERRORS: Record<string, string> = {
+  cancelled: "Checkout was cancelled — nothing was charged.",
+  server: "Something went wrong on our end — please try again in a moment.",
+};
+const errorMessage = errorCode ? (ERRORS[errorCode] ?? ERRORS.server) : null;
+
+const alreadyAtOrAbove =
+  listing && isUpgradeTier(requestedPlan) && tierRank(listing.planTier) <= tierRank(requestedPlan as PlanTier);
+---
+
+<BaseLayout
+  title={`Upgrade your listing — ${site.name}`}
+  description="Upgrade your business listing to Spotlight or All Access."
+>
+  <section class="mx-auto max-w-xl px-5 py-14">
+    {
+      !listing || !plan ? (
+        <div class="rule-capped pt-5">
+          <h1 class="font-display text-head">We couldn't find that listing</h1>
+          <p class="mt-3 text-sub text-ink-soft">
+            The link may be out of date. You can find your business from the full list instead.
+          </p>
+          <a href="/listings" class="mt-6 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper">
+            Browse all listings &rarr;
+          </a>
+        </div>
+      ) : listing.claimStatus !== "claimed" ? (
+        <div class="rule-capped pt-5">
+          <h1 class="font-display text-head">Claim {listing.businessName} first</h1>
+          <p class="mt-3 text-sub text-ink-soft">
+            Upgrading is for owners who've already claimed their listing — that's how we
+            know where to send it.
+          </p>
+          <a href={`/claim?t=${listing.id}`} class="mt-6 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper">
+            Claim this listing &rarr;
+          </a>
+        </div>
+      ) : alreadyAtOrAbove ? (
+        <div class="rule-capped pt-5">
+          <h1 class="font-display text-head">You're already on {plan.name} or higher</h1>
+          <p class="mt-3 text-sub text-ink-soft">
+            Nothing to do here — head back to your listing.
+          </p>
+          <a href={`/business/${listing.slug}`} class="mt-6 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper">
+            View the listing &rarr;
+          </a>
+        </div>
+      ) : (
+        <>
+          <div class:list={[`hue-${plan.hue}`, "rule-capped pt-5"]}>
+            <p class="meta hue-fg font-bold">Upgrading {listing.businessName} to</p>
+            <h1 class="font-display text-head">{plan.name}</h1>
+            <p class="mt-2 text-sub text-ink-soft">{plan.blurb}</p>
+            <p class="font-display mt-4 text-4xl font-extrabold tracking-tight">{plan.price}</p>
+            <p class="meta mt-1">{plan.period}</p>
+          </div>
+
+          {errorMessage && (
+            <p class="mt-6 border-2 border-signal bg-signal/10 px-4 py-3 text-sm font-semibold text-signal-sunk">
+              {errorMessage}
+            </p>
+          )}
+
+          <form method="POST" action="/api/checkout" class="mt-8">
+            <input type="hidden" name="listingId" value={listing.id} />
+            <input type="hidden" name="plan" value={plan.id} />
+            <button
+              type="submit"
+              class="w-full bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk"
+            >
+              Continue to checkout &rarr;
+            </button>
+          </form>
+
+          <a href={`/business/${listing.slug}`} class="meta mt-5 block text-center text-ink-mute">
+            Never mind, back to the listing
+          </a>
+        </>
+      )
+    }
+  </section>
+</BaseLayout>

@@ -143,6 +143,37 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<Result
   return { ok: true };
 }
 
+/**
+ * A checkout succeeded — write the new plan tier back to GHL. Called from
+ * `/api/checkout` in mock mode (there's no real payment to wait on) and from
+ * the Stripe webhook in live mode (the redirect back to the browser is not
+ * trustworthy proof of payment; the webhook is).
+ */
+export async function applyPlanUpgrade(input: {
+  listingId: string;
+  plan: "featured" | "premium";
+}): Promise<Result> {
+  if (DATA_SOURCE !== "ghl") {
+    logDev("upgrade", input);
+    return { ok: true };
+  }
+
+  const token = requireEnv("GHL_PIT_TOKEN");
+  if (!token) return { ok: false, error: "GHL_PIT_TOKEN is not set" };
+
+  const planLabel = input.plan === "premium" ? "Premium" : "Featured";
+  const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
+    method: "PUT",
+    headers: ghlHeaders(token),
+    body: JSON.stringify({
+      customFields: [{ key: "plan_tier", fieldValue: planLabel }],
+    }),
+  });
+
+  if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
+  return { ok: true };
+}
+
 // ── GHL helpers ──────────────────────────────────────────────────────────────
 
 function ghlHeaders(token: string) {
