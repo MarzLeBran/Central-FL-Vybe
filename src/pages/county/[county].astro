@@ -1,0 +1,69 @@
+---
+// One page per county — the second browse axis alongside category.
+// Lists every category present in that county, then every listing in it.
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ListingCard from "../../components/ListingCard.astro";
+import { site } from "../../config/site";
+import { tierRank } from "../../types/listing";
+import { categorySlug } from "../../lib/slug";
+import { categoryHues } from "../../lib/categories";
+import { countySlug, getCountyCategoryIndex } from "../../lib/counties";
+
+export async function getStaticPaths() {
+  const index = await getCountyCategoryIndex();
+  return site.counties
+    .filter((c) => index[c.name])
+    .map((c) => ({
+      params: { county: countySlug(c.name) },
+      props: { county: c, byCategory: index[c.name]! },
+    }));
+}
+
+const { county, byCategory } = Astro.props;
+const hues = await categoryHues();
+
+const categories = Object.entries(byCategory).sort((a, b) => b[1].length - a[1].length);
+const listings = Object.values(byCategory).flat();
+
+const ordered = [...listings].sort(
+  (a, b) =>
+    tierRank(a.planTier) - tierRank(b.planTier) ||
+    a.businessName.localeCompare(b.businessName)
+);
+---
+
+<BaseLayout
+  title={`${county.name} County businesses — ${site.name}`}
+  description={`${listings.length} businesses across ${county.name} County: ${county.blurb}`}
+>
+  <section class="mx-auto max-w-6xl px-5 pt-10 pb-12">
+    <a href="/listings" class="meta font-bold hover:text-signal">&larr; All of {site.market}</a>
+
+    <div class="rule-capped mt-4 pt-5">
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <h1 class="font-display text-mast">{county.name} County</h1>
+        <span class="meta">{listings.length} listed &middot; seat: {county.seat}</span>
+      </div>
+    </div>
+
+    <p class="mt-4 max-w-2xl text-sub text-ink-soft">{county.blurb}</p>
+
+    <nav aria-label="Categories in this county" class="mt-6 flex flex-wrap gap-2">
+      {
+        categories.map(([category, items]) => (
+          <a
+            href={`/county/${countySlug(county.name)}/${categorySlug(category)}`}
+            class={`hue-${hues.get(category)} chip hue-block`}
+          >
+            {category} &middot; {items.length}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {ordered.map((listing, i) => <ListingCard listing={listing} index={i} />)}
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,190 @@
+---
+// Instant search over every listing.
+//
+// The index is fetched from /search-index.json on first focus, not on page
+// load — at a few thousand listings that file is the single biggest thing on
+// the site, and most visitors never type anything.
+
+interface Props {
+  /** "hero" is the big one over the banner; "compact" sits in page headers. */
+  variant?: "hero" | "compact";
+  placeholder?: string;
+  id?: string;
+}
+
+const {
+  variant = "hero",
+  placeholder = "Search by name, category, address or keyword",
+  id = "search",
+} = Astro.props;
+
+const isHero = variant === "hero";
+---
+
+<div class="search relative w-full" data-search data-id={id}>
+  <form class="flex" role="search" action="/listings" method="get">
+    <input
+      type="search"
+      name="q"
+      autocomplete="off"
+      placeholder={placeholder}
+      aria-label="Search businesses"
+      aria-expanded="false"
+      aria-controls={`${id}-results`}
+      role="combobox"
+      class:list={[
+        "min-w-0 flex-1 border-0 bg-paper text-ink placeholder:text-ink-mute focus:outline-none",
+        isHero ? "px-5 py-4 text-base sm:text-lg" : "px-4 py-2.5 text-sm",
+      ]}
+      data-search-input
+    />
+    <button
+      type="submit"
+      class:list={[
+        "shrink-0 bg-signal font-bold text-paper hover:bg-signal-sunk",
+        isHero ? "px-6 py-4 text-base sm:px-8" : "px-4 py-2.5 text-sm",
+      ]}
+    >
+      Search
+    </button>
+  </form>
+
+  <ul
+    id={`${id}-results`}
+    role="listbox"
+    hidden
+    class="absolute inset-x-0 top-full z-40 max-h-[22rem] overflow-y-auto border-2 border-ink bg-paper text-left shadow-xl"
+    data-search-results
+  >
+  </ul>
+</div>
+
+<script>
+  import type FuseType from "fuse.js";
+
+  type Row = { s: string; n: string; c: string; a: string; y: string; f: number };
+
+  let indexPromise: Promise<FuseType<Row>> | null = null;
+
+  // Fuse (~26 KB) and the index are both fetched on first focus, not on page
+  // load. Most visitors never touch the search field; they should not pay for it.
+  function loadIndex(): Promise<FuseType<Row>> {
+    if (!indexPromise) {
+      indexPromise = Promise.all([
+        import("fuse.js").then((m) => m.default),
+        fetch("/search-index.json").then((r) => r.json() as Promise<Row[]>),
+      ]).then(
+        ([Fuse, rows]) =>
+          new Fuse(rows, {
+            keys: [
+              { name: "n", weight: 3 },
+              { name: "c", weight: 2 },
+              { name: "a", weight: 1 },
+              { name: "y", weight: 1 },
+            ],
+            threshold: 0.38,
+            ignoreLocation: true,
+            includeScore: true,
+          })
+      );
+    }
+    return indexPromise;
+  }
+
+  const escapeHtml = (s: string) =>
+    s.replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!
+    );
+
+  document.querySelectorAll<HTMLElement>("[data-search]").forEach((root) => {
+    const input = root.querySelector<HTMLInputElement>("[data-search-input]")!;
+    const list = root.querySelector<HTMLUListElement>("[data-search-results]")!;
+    let active = -1;
+    let hrefs: string[] = [];
+
+    const close = () => {
+      list.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      active = -1;
+    };
+
+    const render = (results: { item: Row; score?: number }[]) => {
+      if (!results.length) {
+        list.innerHTML =
+          '<li class="px-4 py-3 text-sm text-ink-mute">No matches. Try a category, or a town.</li>';
+        hrefs = [];
+        list.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+        return;
+      }
+
+      hrefs = results.map((r) => `/business/${r.item.s}`);
+      list.innerHTML = results
+        .map(
+          (r, i) => `
+          <li role="option" aria-selected="false" data-i="${i}">
+            <a href="/business/${r.item.s}"
+               class="flex items-baseline gap-3 border-b border-rule px-4 py-3 hover:bg-paper-sunk">
+              <span class="font-display font-bold">${escapeHtml(r.item.n)}</span>
+              <span class="meta">${escapeHtml(r.item.c)}</span>
+              ${r.item.f ? '<span class="meta text-signal">&#9733;</span>' : ""}
+              <span class="meta ml-auto normal-case tracking-normal">${escapeHtml(r.item.y ? r.item.y + " Co. \u00b7 " : "")}${escapeHtml(r.item.a)}</span>
+            </a>
+          </li>`
+        )
+        .join("");
+      list.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    };
+
+    const highlight = () => {
+      list.querySelectorAll<HTMLLIElement>("li[data-i]").forEach((li, i) => {
+        const on = i === active;
+        li.setAttribute("aria-selected", String(on));
+        li.firstElementChild?.classList.toggle("bg-paper-sunk", on);
+      });
+    };
+
+    const run = async () => {
+      const q = input.value.trim();
+      if (q.length < 2) return close();
+      const fuse = await loadIndex();
+      // Featured listings win ties — that placement is what the upgrade buys.
+      const results = fuse
+        .search(q, { limit: 12 })
+        .sort((a, b) => (a.score! - b.score!) || (b.item.f - a.item.f))
+        .slice(0, 8);
+      active = -1;
+      render(results);
+    };
+
+    input.addEventListener("focus", () => void loadIndex());
+    input.addEventListener("input", () => void run());
+
+    input.addEventListener("keydown", (e) => {
+      if (list.hidden) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const n = hrefs.length;
+        if (!n) return;
+        active = e.key === "ArrowDown" ? (active + 1) % n : (active - 1 + n) % n;
+        highlight();
+      } else if (e.key === "Enter") {
+        if (active >= 0 && hrefs[active]) {
+          e.preventDefault();
+          window.location.href = hrefs[active];
+        } else if (hrefs.length) {
+          e.preventDefault();
+          window.location.href = hrefs[0];
+        }
+      } else if (e.key === "Escape") {
+        close();
+        input.blur();
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!root.contains(e.target as Node)) close();
+    });
+  });
+</script>

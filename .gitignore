@@ -1,5 +1,7 @@
 # build output
 dist/
+# importer output (contains scraped prospect data — keep it out of git)
+out/
 # generated types
 .astro/
 

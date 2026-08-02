@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Listing } from "../types/listing";
+import { isPaidTier } from "../types/listing";
 import mock from "../data/mock-listings.json";
 
 const DATA_SOURCE = import.meta.env.DATA_SOURCE ?? "mock";
@@ -25,8 +26,11 @@ export async function getListingBySlug(slug?: string): Promise<Listing | null> {
   return all.find((l) => l.slug === slug) ?? null;
 }
 
+/** Every listing on a paid plan — both featured and premium. Top tier first. */
 export async function getFeaturedListings(): Promise<Listing[]> {
-  return (await getListings()).filter((l) => l.planTier === "featured");
+  return (await getListings())
+    .filter((l) => isPaidTier(l.planTier))
+    .sort((a, b) => Number(b.planTier === "premium") - Number(a.planTier === "premium"));
 }
 
 export async function getListingsByCategory(): Promise<Record<string, Listing[]>> {

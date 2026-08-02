@@ -1,0 +1,69 @@
+---
+// County + category — "plumbers in Seminole County".
+//
+// These pages are the point of having two browse axes: they match how people
+// actually search locally, and every one of them is static HTML with its own
+// title and description, which is exactly what generative search reads.
+
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import ListingCard from "../../../components/ListingCard.astro";
+import { site } from "../../../config/site";
+import { tierRank } from "../../../types/listing";
+import { categorySlug } from "../../../lib/slug";
+import { hueClass } from "../../../lib/categories";
+import { countySlug, getCountyCategoryIndex } from "../../../lib/counties";
+
+export async function getStaticPaths() {
+  const index = await getCountyCategoryIndex();
+  const paths = [];
+
+  for (const county of site.counties) {
+    const byCategory = index[county.name];
+    if (!byCategory) continue;
+    for (const [category, listings] of Object.entries(byCategory)) {
+      paths.push({
+        params: { county: countySlug(county.name), category: categorySlug(category) },
+        props: { county, category, listings },
+      });
+    }
+  }
+
+  return paths;
+}
+
+const { county, category, listings } = Astro.props;
+const hue = await hueClass(category);
+
+const ordered = [...listings].sort(
+  (a, b) =>
+    tierRank(a.planTier) - tierRank(b.planTier) ||
+    a.businessName.localeCompare(b.businessName)
+);
+---
+
+<BaseLayout
+  title={`${category} in ${county.name} County — ${site.name}`}
+  description={`${listings.length} ${category.toLowerCase()} businesses in ${county.name} County, Florida, around ${county.seat}.`}
+>
+  <section class:list={[hue, "mx-auto max-w-6xl px-5 pt-10 pb-16"]}>
+    <p class="meta flex flex-wrap gap-x-3">
+      <a href={`/county/${countySlug(county.name)}`} class="hue-fg font-bold">
+        &larr; {county.name} County
+      </a>
+      <a href={`/category/${categorySlug(category)}`} class="font-bold hover:text-signal">
+        {category} everywhere
+      </a>
+    </p>
+
+    <div class="rule-capped mt-4 pt-5">
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <h1 class="font-display text-mast">{category}</h1>
+        <span class="meta">{listings.length} in {county.name} County</span>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {ordered.map((listing, i) => <ListingCard listing={listing} index={i} />)}
+    </div>
+  </section>
+</BaseLayout>

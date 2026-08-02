@@ -1,0 +1,49 @@
+---
+// One page per category, pre-rendered. Slugs carry no listing counts — unlike
+// the reference site, these URLs survive a business being added or removed.
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ListingCard from "../../components/ListingCard.astro";
+import { site } from "../../config/site";
+import { categorySlug } from "../../lib/slug";
+import { hueClass } from "../../lib/categories";
+import { tierRank } from "../../types/listing";
+import { getListingsByCategory } from "../../lib/directory";
+
+export async function getStaticPaths() {
+  const byCategory = await getListingsByCategory();
+  return Object.entries(byCategory).map(([category, listings]) => ({
+    params: { category: categorySlug(category) },
+    props: { category, listings },
+  }));
+}
+
+const { category, listings } = Astro.props;
+const hue = await hueClass(category);
+
+const ordered = [...listings].sort(
+  (a, b) =>
+    tierRank(a.planTier) - tierRank(b.planTier) ||
+    a.businessName.localeCompare(b.businessName)
+);
+---
+
+<BaseLayout
+  title={`${category} in ${site.market} — ${site.name}`}
+  description={`${listings.length} ${category.toLowerCase()} businesses serving ${site.towns.join(", ")}.`}
+>
+  <section class:list={[hue, "mx-auto max-w-6xl px-5 pt-10 pb-16"]}>
+    <a href="/listings" class="meta hue-fg font-bold">&larr; All listings</a>
+
+    <div class="rule-capped mt-4 pt-5">
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <h1 class="font-display text-mast">{category}</h1>
+        <span class="meta">{listings.length} in {site.market}</span>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {ordered.map((listing, i) => <ListingCard listing={listing} index={i} />)}
+    </div>
+  </section>
+</BaseLayout>

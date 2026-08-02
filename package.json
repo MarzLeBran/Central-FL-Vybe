@@ -9,11 +9,13 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "import": "node scripts/import-listings.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.1.6",
+    "fuse.js": "^7.5.0",
     "tailwindcss": "^4.3.3"
   }
 }

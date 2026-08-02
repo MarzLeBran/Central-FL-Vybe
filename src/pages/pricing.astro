@@ -1,0 +1,107 @@
+---
+// GET LISTED — the three directory plans.
+//
+// Scope: this page sells the DIRECTORY only. The GHL agency retainer is a
+// separate conversation that happens after a claim, and must never appear here.
+//
+// Plans and the feature matrix both come from src/config/site.ts so marketing
+// copy, prices and what-you-get stay in one place.
+
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { site } from "../config/site";
+import { getListings } from "../lib/directory";
+
+const listings = await getListings();
+const tiers = site.plans;
+
+type TierId = "free" | "featured" | "premium";
+const has = (row: (typeof site.planFeatures)[number], id: TierId) => row[id];
+---
+
+<BaseLayout
+  title={`Get listed — ${site.name}`}
+  description={`Directory plans for ${site.market} businesses. Free listings always stay free.`}
+>
+  <section class="mx-auto max-w-6xl px-5 pt-12 pb-8">
+    <div class="rule-capped pt-5">
+      <h1 class="font-display text-mast">Get listed</h1>
+    </div>
+    <p class="mt-4 max-w-2xl text-sub text-ink-soft">
+      Every business in {site.market} can be on here for free, forever. The paid plans
+      buy reach and tools — not the basics.
+    </p>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-5 pb-12">
+    <div class="grid gap-6 lg:grid-cols-3">
+      {
+        tiers.map((tier, i) => (
+          <div
+            class:list={[
+              `hue-${tier.hue}`,
+              "flex flex-col border-2 bg-paper",
+              tier.highlight ? "border-[var(--h)] shadow-xl lg:-mt-3 lg:mb-3" : "border-rule",
+            ]}
+            data-reveal
+            data-reveal-index={i}
+          >
+            <div class="hue-block px-5 py-2">
+              <span class="meta font-bold">{tier.badge}</span>
+            </div>
+
+            <div class="border-b-2 border-rule px-5 pb-6 pt-5">
+              <h2 class="font-display text-2xl font-extrabold tracking-tight">{tier.name}</h2>
+              <p class="mt-1.5 min-h-[3rem] text-sm text-ink-soft">{tier.blurb}</p>
+              <p class="font-display mt-4 text-4xl font-extrabold tracking-tight">{tier.price}</p>
+              <p class="meta mt-1">{tier.period}</p>
+              <a
+                href={tier.cta.href}
+                class="hue-block mt-5 block w-full px-5 py-3 text-center text-sm font-bold"
+              >
+                {tier.cta.label}
+              </a>
+            </div>
+
+            <ul class="flex-1 divide-y divide-rule px-5">
+              {site.planFeatures.map((row) => {
+                const on = has(row, tier.id as TierId);
+                return (
+                  <li
+                    class:list={[
+                      "flex items-start gap-2.5 py-2.5 text-sm",
+                      on ? "" : "text-ink-mute",
+                    ]}
+                  >
+                    <span
+                      aria-hidden="true"
+                      class:list={["mt-0.5 font-bold", on ? "hue-fg" : "text-ink-mute"]}
+                    >
+                      {on ? "✓" : "—"}
+                    </span>
+                    <span class={on ? "" : "line-through decoration-1"}>{row.label}</span>
+                    <span class="sr-only">{on ? "included" : "not included"}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-5 pb-16">
+    <div class="hue-lagoon">
+      <div class="hue-block px-6 py-9 sm:px-10">
+        <h2 class="font-display text-head">Not sure yet? Start free.</h2>
+        <p class="mt-3 max-w-2xl text-sub opacity-85">
+          There are {listings.length} businesses on here and a free listing costs nothing,
+          ever. Claim yours, see what it does for you, and upgrade only if it earns it.
+        </p>
+        <p class="meta mt-6 opacity-70">
+          Checkout wires up in Layer 4 — Stripe, with the plan written back to GHL
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

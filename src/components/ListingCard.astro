@@ -1,0 +1,84 @@
+---
+// One business, as a tile. Used by the home page, the full listings grid and
+// every category page — change it once, changes all.
+//
+// The tile carries its category's hue: the image band, the hover lift shadow
+// and the category label all read from --h, set by hueClass() on the wrapper.
+// `index` only staggers the scroll-in animation.
+
+import type { Listing } from "../types/listing";
+import { isPaidTier } from "../types/listing";
+import { site } from "../config/site";
+import { hueClass } from "../lib/categories";
+
+interface Props {
+  listing: Listing;
+  index?: number;
+}
+
+const { listing, index = 0 } = Astro.props;
+const cover = listing.imageUrls?.[0];
+const hue = await hueClass(listing.category);
+
+// The mark names the actual plan, so the tiers are visible in the wild rather
+// than only on /pricing.
+const plan = site.plans.find((p) => p.id === listing.planTier);
+const isPaid = isPaidTier(listing.planTier);
+---
+
+<a
+  href={`/business/${listing.slug}`}
+  data-reveal
+  data-reveal-index={index}
+  data-slug={listing.slug}
+  class:list={[hue, "lift group flex flex-col border-2 border-rule bg-paper"]}
+>
+  <div class="relative aspect-[16/10] w-full overflow-hidden border-b-4 border-[var(--h)] bg-paper-sunk">
+    {
+      cover ? (
+        <img
+          src={cover}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          class="h-full w-full object-cover"
+        />
+      ) : (
+        <img
+          src={site.fallbackImage}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          class="absolute inset-0 m-auto w-[78%] max-w-full object-contain p-3 opacity-90"
+        />
+      )
+    }
+
+    {
+      isPaid && plan && (
+        <span class="chip absolute left-0 top-0 bg-ink font-bold text-paper">
+          &#9733; {plan.name}
+        </span>
+      )
+    }
+  </div>
+
+  <div class="flex flex-1 flex-col p-4">
+    <p class="meta flex flex-wrap items-center gap-x-2">
+      <span class="hue-fg font-bold">{listing.category}</span>
+      {listing.claimStatus === "claimed" && <span>&middot; Claimed</span>}
+    </p>
+
+    <h3 class="font-display mt-1.5 text-lg font-extrabold leading-tight tracking-tight">
+      {listing.businessName}
+    </h3>
+
+    <p class="mt-1.5 line-clamp-2 text-sm text-ink-soft">{listing.description}</p>
+
+    <p class="meta mt-auto flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-3">
+      {listing.rating && <span class="hue-fg font-bold">&#9733; {listing.rating} ({listing.reviewCount})</span>}
+      {listing.county && <span class="font-bold">{listing.county} Co.</span>}
+      <span class="normal-case tracking-normal">{listing.address}</span>
+    </p>
+  </div>
+</a>

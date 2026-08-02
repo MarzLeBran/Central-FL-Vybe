@@ -1,0 +1,110 @@
+---
+// Every listing, Featured first.
+//
+// This is also the landing page for the hero search button (`?q=`). The page is
+// static, so filtering happens client-side against the same Fuse index the
+// search box uses — the full grid is in the HTML for crawlers either way.
+
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ListingCard from "../components/ListingCard.astro";
+import { site } from "../config/site";
+import { categorySlug } from "../lib/slug";
+import { categoryHues } from "../lib/categories";
+import { tierRank } from "../types/listing";
+import { getListings, getListingsByCategory } from "../lib/directory";
+
+const listings = await getListings();
+const byCategory = await getListingsByCategory();
+
+// Higher plans float to the top — that placement is what the upgrade buys.
+const ordered = [...listings].sort(
+  (a, b) =>
+    tierRank(a.planTier) - tierRank(b.planTier) ||
+    a.businessName.localeCompare(b.businessName)
+);
+
+const categories = Object.keys(byCategory).sort();
+const hues = await categoryHues();
+---
+
+<BaseLayout
+  title={`All listings — ${site.name}`}
+  description={`Every business listed in ${site.market}, from ${site.towns.join(", ")}.`}
+>
+  <section class="mx-auto max-w-6xl px-5 pt-10 pb-16">
+    <div class="rule-capped pt-5">
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <h1 class="font-display text-mast">All listings</h1>
+        <span class="meta">{listings.length} across {site.market}</span>
+      </div>
+    </div>
+
+    <nav class="mt-5 flex flex-wrap gap-2">
+      {
+        categories.map((category) => (
+          <a href={`/category/${categorySlug(category)}`} class={`hue-${hues.get(category)} chip hue-block`}>
+            {category}
+          </a>
+        ))
+      }
+    </nav>
+
+    <p id="search-summary" hidden class="meta mt-5"></p>
+
+    <div id="grid" class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {ordered.map((listing, i) => <ListingCard listing={listing} index={i} />)}
+    </div>
+
+    <p id="search-empty" hidden class="mt-8 text-sub text-ink-soft">
+      Nothing matched. <a href="/listings" class="font-bold text-signal">Show everything</a>.
+    </p>
+  </section>
+</BaseLayout>
+
+<script>
+  type Row = { s: string; n: string; c: string; a: string; y: string; f: number };
+
+  // Only pulled in when there is actually a ?q= to filter by.
+  const q = new URLSearchParams(location.search).get("q")?.trim();
+  if (q) {
+    const grid = document.getElementById("grid")!;
+    const summary = document.getElementById("search-summary")!;
+    const empty = document.getElementById("search-empty")!;
+    const tiles = Array.from(grid.querySelectorAll<HTMLElement>("[data-slug]"));
+
+    Promise.all([
+      import("fuse.js").then((m) => m.default),
+      fetch("/search-index.json").then((r) => r.json() as Promise<Row[]>),
+    ])
+      .then(([Fuse, rows]) => {
+        const fuse = new Fuse(rows, {
+          keys: [
+            { name: "n", weight: 3 },
+            { name: "c", weight: 2 },
+            { name: "a", weight: 1 },
+            { name: "y", weight: 1 },
+          ],
+          threshold: 0.38,
+          ignoreLocation: true,
+        });
+
+        const hits = fuse.search(q).map((r) => r.item.s);
+        const keep = new Set(hits);
+
+        tiles.forEach((t) => {
+          t.hidden = !keep.has(t.dataset.slug!);
+        });
+
+        // Reorder surviving tiles to match relevance ranking.
+        hits.forEach((slug) => {
+          const t = tiles.find((x) => x.dataset.slug === slug);
+          if (t) grid.appendChild(t);
+        });
+
+        const safe = q.replace(/[&<>"']/g, "");
+        summary.innerHTML = `${hits.length} result${hits.length === 1 ? "" : "s"} for &ldquo;${safe}&rdquo; &middot; <a href="/listings" class="font-bold text-signal">show everything</a>`;
+        summary.hidden = false;
+        empty.hidden = hits.length > 0;
+      });
+  }
+</script>

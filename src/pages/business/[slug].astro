@@ -1,10 +1,26 @@
 ---
-import '../../styles/global.css';
+// LISTING DETAIL — the page the whole funnel points at.
+//
+// VALUE POLICY: a free listing is a real, useful, complete page — description,
+// map, hours, socials, website, structured data, the lot. What Featured buys is
+// placement, the photo gallery, the Featured mark and the per-listing AI agent.
+// We do not cripple free pages to manufacture upgrades; the directory has to be
+// worth linking to on its own or the whole foot-in-the-door premise collapses.
+//
+// AEO note: the JSON-LD emits aggregateRating and openingHours — both of which
+// the reference site omits or emits malformed. Structured data is most of what
+// generative search reads off a page like this.
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+import { categorySlug } from "../../lib/slug";
+import { countySlug } from "../../lib/counties";
+import { hueClass } from "../../lib/categories";
+import { isPaidTier, hasListingAgent } from "../../types/listing";
 import { getListings, getListingBySlug } from "../../lib/directory";
 import DirectoryWidget from "../../components/DirectoryWidget.astro";
 import ListingAgentWidget from "../../components/ListingAgentWidget.astro";
 
-// Pre-render every listing page at build time (great for SEO/AEO).
 export async function getStaticPaths() {
   const listings = await getListings();
   return listings.map((l) => ({ params: { slug: l.slug } }));
@@ -15,63 +31,184 @@ const listing = await getListingBySlug(slug);
 if (!listing) return Astro.redirect("/404");
 
 // ── THE ROUTING RULE ─────────────────────────────────────────────────────────
-// Featured page  -> per-listing business agent ONLY.
+// TOP-TIER page  -> per-listing business agent ONLY.
 // Everything else -> directory-wide GHL assistant.
-// Never both on one page.
-const isFeatured = listing.planTier === "featured";
+// Never both on one page. BaseLayout gets widget="none" so it stays out of it.
+//
+// Note the tier boundary: "AI agent for your listing" is an All Access feature
+// on /pricing, so the mid tier does NOT get its own agent. hasListingAgent() is
+// the single place that decides this.
+const isPaid = isPaidTier(listing.planTier);
+const showsAgent = hasListingAgent(listing.planTier);
+const plan = site.plans.find((p) => p.id === listing.planTier);
+const hue = await hueClass(listing.category);
+
+const socials = Object.entries(listing.socialLinks ?? {});
+const [cover, ...gallery] = listing.imageUrls ?? [];
+const mapQuery = encodeURIComponent(`${listing.businessName}, ${listing.address}`);
+
+const jsonLd: Record<string, unknown> = {
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "@id": `${site.origin}/business/${listing.slug}#localbusiness`,
+  name: listing.businessName,
+  description: listing.description,
+  url: `${site.origin}/business/${listing.slug}`,
+  telephone: listing.phone,
+  address: { "@type": "PostalAddress", streetAddress: listing.address },
+};
+if (listing.website) jsonLd.sameAs = [listing.website, ...socials.map(([, url]) => url)];
+if (listing.imageUrls?.length) jsonLd.image = listing.imageUrls;
+if (listing.hours) jsonLd.openingHours = listing.hours;
+if (listing.rating && listing.reviewCount) {
+  jsonLd.aggregateRating = {
+    "@type": "AggregateRating",
+    ratingValue: listing.rating,
+    reviewCount: listing.reviewCount,
+  };
+}
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{listing.businessName} — Directory</title>
-    <meta name="description" content={listing.description} />
-  </head>
-  <body class="bg-white text-slate-900">
-    <main class="mx-auto max-w-3xl px-6 py-12">
-      <a href="/" class="text-sm text-slate-500 hover:text-slate-900">← Back to directory</a>
+<BaseLayout
+  title={`${listing.businessName} — ${listing.category} in ${site.market}`}
+  description={listing.description}
+  widget="none"
+>
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-      <div class="mt-4 flex items-start justify-between gap-4">
-        <div>
-          <p class="text-sm font-medium uppercase tracking-wide text-slate-500">{listing.category}</p>
-          <h1 class="mt-1 text-3xl font-semibold">{listing.businessName}</h1>
-        </div>
-        {isFeatured && (
-          <span class="rounded-full bg-amber-400 px-3 py-1 text-xs font-semibold text-slate-900">
-            ★ Featured
-          </span>
-        )}
+  <article class:list={[hue, "mx-auto max-w-3xl px-5 pt-10 pb-16"]}>
+    <a href={`/category/${categorySlug(listing.category)}`} class="meta hue-fg font-bold">
+      &larr; {listing.category}
+    </a>
+
+    {
+      cover && (
+        <img
+          src={cover}
+          alt={listing.businessName}
+          class="mt-4 aspect-[16/7] w-full object-cover"
+        />
+      )
+    }
+
+    <div class="rule-capped mt-6 pt-5">
+      <p class="meta flex flex-wrap items-center gap-2">
+        <span class="hue-fg font-bold">{listing.category}</span>
+        {isPaid && plan && <span class="hue-block chip">&#9733; {plan.name}</span>}
+        {listing.claimStatus === "claimed" && <span>&middot; Claimed by owner</span>}
+      </p>
+      <h1 class="font-display mt-3 text-mast">{listing.businessName}</h1>
+      {
+        listing.rating && (
+          <p class="meta hue-fg mt-3 font-bold">
+            &#9733; {listing.rating} &middot; {listing.reviewCount} reviews
+          </p>
+        )
+      }
+    </div>
+
+    <p class="mt-6 text-sub text-ink-soft">{listing.description}</p>
+
+    <dl class="mt-8 grid grid-cols-1 gap-x-8 gap-y-5 border-t-2 border-rule pt-6 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="meta">Address</dt>
+        <dd class="mt-1">{listing.address}</dd>
+        {
+          listing.county && (
+            <dd class="mt-1">
+              <a
+                href={`/county/${countySlug(listing.county)}/${categorySlug(listing.category)}`}
+                class="meta hue-fg font-bold"
+              >
+                {listing.category} in {listing.county} County &rarr;
+              </a>
+            </dd>
+          )
+        }
       </div>
+      <div>
+        <dt class="meta">Phone</dt>
+        <dd class="mt-1">
+          <a href={`tel:${listing.phone}`} class="hue-fg font-bold">{listing.phone}</a>
+        </dd>
+      </div>
+      {
+        listing.hours && (
+          <div>
+            <dt class="meta">Hours</dt>
+            <dd class="mt-1">{listing.hours}</dd>
+          </div>
+        )
+      }
+      {
+        listing.website && (
+          <div>
+            <dt class="meta">Website</dt>
+            <dd class="mt-1">
+              <a href={listing.website} rel="nofollow noopener" class="hue-fg font-bold">
+                Visit site &rarr;
+              </a>
+            </dd>
+          </div>
+        )
+      }
+    </dl>
 
-      {listing.rating && (
-        <p class="mt-2 text-sm text-slate-600">
-          ★ {listing.rating} · {listing.reviewCount} reviews
-        </p>
-      )}
+    {
+      socials.length > 0 && (
+        <div class="mt-6 flex flex-wrap gap-2">
+          {socials.map(([network, url]) => (
+            <a href={url} rel="nofollow noopener" class="chip hue-block">
+              {network}
+            </a>
+          ))}
+        </div>
+      )
+    }
 
-      <p class="mt-6 text-slate-700">{listing.description}</p>
+    {
+      gallery.length > 0 && (
+        <div class="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {gallery.map((src) => (
+            <img src={src} alt="" loading="lazy" class="aspect-square w-full object-cover" />
+          ))}
+        </div>
+      )
+    }
 
-      <dl class="mt-8 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div><dt class="text-slate-400">Address</dt><dd>{listing.address}</dd></div>
-        <div><dt class="text-slate-400">Phone</dt><dd>{listing.phone}</dd></div>
-        {listing.hours && <div><dt class="text-slate-400">Hours</dt><dd>{listing.hours}</dd></div>}
-        {listing.website && (
-          <div><dt class="text-slate-400">Website</dt><dd><a href={listing.website} class="underline">Visit</a></dd></div>
-        )}
-      </dl>
+    <div class="mt-8">
+      <p class="meta mb-2">Find them</p>
+      <iframe
+        title={`Map showing ${listing.businessName}`}
+        src={`https://maps.google.com/maps?q=${mapQuery}&output=embed`}
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        class="aspect-[16/9] w-full border-2 border-rule"
+      />
+    </div>
 
-      {!isFeatured && listing.claimStatus === "unclaimed" && (
-        <a
-          href={`/claim?t=${listing.id}`}
-          class="mt-8 inline-block rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white"
-        >
-          Is this your business? Claim it free →
-        </a>
-      )}
-    </main>
+    {
+      listing.claimStatus === "unclaimed" && (
+        <div class="mt-10">
+          <div class="hue-block px-6 py-8">
+            <h2 class="font-display text-2xl font-extrabold tracking-tight">
+              Is this your business?
+            </h2>
+            <p class="mt-2 max-w-md text-sub opacity-80">
+              This page is live and free, and it stays that way. Claiming it just means you
+              control the details, the photos and the hours — and messages come to you.
+            </p>
+            <a
+              href={`/claim?t=${listing.id}`}
+              class="mt-5 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper"
+            >
+              Claim this listing &rarr;
+            </a>
+          </div>
+        </div>
+      )
+    }
+  </article>
 
-    <!-- ONE widget, chosen by tier. This is the whole two-widget model. -->
-    {isFeatured ? <ListingAgentWidget listing={listing} /> : <DirectoryWidget />}
-  </body>
-</html>
+  {showsAgent ? <ListingAgentWidget listing={listing} /> : <DirectoryWidget />}
+</BaseLayout>

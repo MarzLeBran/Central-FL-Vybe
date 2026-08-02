@@ -1,0 +1,143 @@
+---
+// The one shell every page uses. Owns <head>, the masthead bar, the footer, and
+// — importantly — THE WIDGET ROUTING RULE.
+//
+// Widget rule (AGENTS.md): exactly one chat widget per page, never two.
+//   widget="directory"  -> directory-wide assistant (default: home, grid,
+//                          category pages, and FREE listing pages)
+//   widget="none"       -> the page mounts its own (Featured listing pages
+//                          mount the per-listing business agent instead)
+// Centralising it here is what makes "never two on one page" structural rather
+// than something every new page has to remember.
+
+import "../styles/global.css";
+import { site } from "../config/site";
+import SiteHeader from "../components/SiteHeader.astro";
+import DirectoryWidget from "../components/DirectoryWidget.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  /** Which chat widget this page gets. Defaults to the directory-wide one. */
+  widget?: "directory" | "none";
+  /** Home hides the header's compact search — it has the big hero one. */
+  showHeaderSearch?: boolean;
+}
+
+const {
+  title,
+  description,
+  widget = "directory",
+  showHeaderSearch = true,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, site.origin).href;
+
+// Channels render only once they have a url, so the site can ship before every
+// account exists. Fill them in at config/site.ts.
+const channels = site.channels.filter((c) => c.url);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(site.ogImage, site.origin).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL(site.ogImage, site.origin).href} />
+    <meta name="generator" content={Astro.generator} />
+    <script is:inline>
+      // Marks that JS is available, so the reveal animation can safely start
+      // tiles hidden. Without this class they stay visible — no blank page if
+      // the bundle fails.
+      document.documentElement.classList.add("js");
+    </script>
+  </head>
+
+  <body class="min-h-screen">
+    <SiteHeader showSearch={showHeaderSearch} />
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="hue-citrus mt-20 border-t-2 border-rule bg-paper-sunk">
+      <div class="mx-auto max-w-6xl px-5 py-12">
+        {
+          site.logoTagline ? (
+            <img
+              src={site.logoTagline}
+              alt={`${site.logoAlt} — ${site.tagline}`}
+              width="450"
+              height="175"
+              class="h-auto w-full max-w-[380px]"
+            />
+          ) : (
+            <p class="font-display text-3xl font-extrabold tracking-tight">{site.name}</p>
+          )
+        }
+
+        {
+          channels.length > 0 && (
+            <div class="mt-6 flex flex-wrap gap-2">
+              {channels.map((c) => (
+                <a href={c.url} rel="noopener" class="chip hue-block">
+                  {c.name}
+                </a>
+              ))}
+            </div>
+          )
+        }
+
+        <p class="meta mt-6">{site.towns.join(" &middot; ")}</p>
+        <p class="meta mt-8 text-ink-mute">
+          &copy; {site.established} {site.name} &middot;
+          <a href={`mailto:${site.contactEmail}`} class="hue-fg font-bold">
+            {site.contactEmail}
+          </a>
+        </p>
+      </div>
+    </footer>
+
+    {widget === "directory" && <DirectoryWidget />}
+
+    <script>
+      // Reveal tiles as they scroll in, staggered a little within each row.
+      const items = document.querySelectorAll<HTMLElement>("[data-reveal]");
+
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && items.length) {
+        const io = new IntersectionObserver(
+          (entries, obs) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const el = entry.target as HTMLElement;
+              const i = Number(el.dataset.revealIndex ?? 0) % 4;
+              el.style.transitionDelay = `${i * 70}ms`;
+              el.classList.add("is-in");
+              obs.unobserve(el);
+            });
+          },
+          { rootMargin: "0px 0px -8% 0px", threshold: 0.08 }
+        );
+        items.forEach((el) => io.observe(el));
+      } else {
+        items.forEach((el) => el.classList.add("is-in"));
+      }
+    </script>
+  </body>
+</html>

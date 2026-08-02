@@ -5,18 +5,21 @@
     "businessName": "Clean Lab by EZ",
     "category": "Auto Detailing",
     "description": "Mobile detailing that comes to you across St. Cloud and Kissimmee. Ceramic coatings, paint correction, interior deep-cleans — booked online, done in your driveway.",
-    "address": "Serving St. Cloud, FL",
+    "address": "Serving Winter Park and Orlando, FL",
     "phone": "(407) 555-0142",
     "website": "https://example.com",
     "rating": 4.9,
     "reviewCount": 63,
     "imageUrls": [],
     "hours": "Mon–Sat 8am–6pm",
-    "socialLinks": { "instagram": "https://instagram.com" },
-    "planTier": "featured",
+    "socialLinks": {
+      "instagram": "https://instagram.com"
+    },
+    "planTier": "premium",
     "claimStatus": "claimed",
     "aiContext": "Clean Lab by EZ is a mobile auto-detailing business serving St. Cloud and Kissimmee. Services: ceramic coating, paint correction, interior deep-clean, exterior wash-and-wax. Mobile only — we come to the customer. Booking is online. Hours Mon–Sat 8am–6pm.",
-    "agencyClient": false
+    "agencyClient": false,
+    "county": "Orange"
   },
   {
     "id": "c_002",
@@ -34,7 +37,8 @@
     "claimStatus": "claimed",
     "aiContext": "Lakefront Barbers is a barbershop in downtown St. Cloud, FL. Services: classic cuts, fades, beard trims, hot-towel shaves. Walk-ins welcome, appointments preferred. Hours Tue–Sat 9am–7pm.",
     "agencyClient": true,
-    "clientLocationId": "REPLACE_WITH_CLIENT_SUBACCOUNT_ID"
+    "clientLocationId": "REPLACE_WITH_CLIENT_SUBACCOUNT_ID",
+    "county": "Osceola"
   },
   {
     "id": "c_003",
@@ -42,14 +46,15 @@
     "businessName": "Sunshine HVAC & Cooling",
     "category": "Home Services",
     "description": "AC repair and installation for Osceola County homes. Same-day service on most units.",
-    "address": "St. Cloud, FL",
+    "address": "Serving Lake Mary and Sanford, FL",
     "phone": "(407) 555-0207",
     "rating": 4.6,
     "reviewCount": 28,
     "imageUrls": [],
     "planTier": "free",
     "claimStatus": "unclaimed",
-    "agencyClient": false
+    "agencyClient": false,
+    "county": "Seminole"
   },
   {
     "id": "c_004",
@@ -57,14 +62,15 @@
     "businessName": "Bloom Hair Studio",
     "category": "Health & Beauty",
     "description": "Color, balayage, and cuts in a calm boutique salon. Bilingual stylists.",
-    "address": "St. Cloud, FL",
+    "address": "2210 Highland Ave, Melbourne, FL",
     "phone": "(407) 555-0233",
     "rating": 4.8,
     "reviewCount": 52,
     "imageUrls": [],
     "planTier": "free",
     "claimStatus": "unclaimed",
-    "agencyClient": false
+    "agencyClient": false,
+    "county": "Brevard"
   },
   {
     "id": "c_005",
@@ -79,7 +85,8 @@
     "imageUrls": [],
     "planTier": "free",
     "claimStatus": "unclaimed",
-    "agencyClient": false
+    "agencyClient": false,
+    "county": "Osceola"
   },
   {
     "id": "c_006",
@@ -95,6 +102,7 @@
     "hours": "Tue–Sun 11am–9pm",
     "planTier": "free",
     "claimStatus": "unclaimed",
-    "agencyClient": false
+    "agencyClient": false,
+    "county": "Osceola"
   }
 ]
