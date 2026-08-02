@@ -162,7 +162,7 @@ export const site = {
       price: "Free",
       period: "always",
       blurb: "Get found in Central Florida — a real page with your map, hours and links.",
-      cta: { label: "Add your business", href: "/#add" },
+      cta: { label: "Add your business", href: "/add-business" },
       hue: "lagoon",
       highlight: false,
     },
@@ -173,7 +173,10 @@ export const site = {
       price: "$250",
       period: "per year",
       blurb: "Stand out from the crowd and turn views into real customers.",
-      cta: { label: "Upgrade now", href: "/#add" },
+      // Upgrading presupposes an already-claimed listing, and there is no
+      // checkout yet (Stripe wiring is Layer 4). Send them to find/claim their
+      // listing first rather than invent a fake upgrade flow.
+      cta: { label: "Find your listing", href: "/listings" },
       hue: "sun",
       highlight: true,
     },
@@ -184,7 +187,7 @@ export const site = {
       price: "$699",
       period: "per year",
       blurb: "Own the room — premium placement, maximum visibility, your own AI agent.",
-      cta: { label: "Upgrade now", href: "/#add" },
+      cta: { label: "Find your listing", href: "/listings" },
       hue: "coral",
       highlight: false,
     },

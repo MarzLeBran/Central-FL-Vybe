@@ -13,6 +13,7 @@
     "import": "node scripts/import-listings.mjs"
   },
   "dependencies": {
+    "@astrojs/vercel": "^11.0.4",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.1.6",
     "fuse.js": "^7.5.0",

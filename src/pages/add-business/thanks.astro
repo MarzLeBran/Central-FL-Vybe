@@ -1,0 +1,37 @@
+---
+// Static, same pattern as /claim/thanks — the business name is filled in
+// client-side from ?business= so the page itself stays plain prerendered HTML.
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+---
+
+<BaseLayout
+  title={`Submission received — ${site.name}`}
+  description="Your business submission is being reviewed."
+>
+  <section class="mx-auto max-w-xl px-5 py-20 text-center">
+    <p class="meta font-bold text-signal">Submitted</p>
+    <h1 class="font-display mt-3 text-head">
+      Thanks<span data-business-suffix></span>
+    </h1>
+    <p class="mt-4 text-sub text-ink-soft">
+      We'll review your submission and it'll be live on the directory shortly.
+      Questions in the meantime? Reach us at{" "}
+      <a href={`mailto:${site.contactEmail}`} class="font-bold text-signal">
+        {site.contactEmail}
+      </a>.
+    </p>
+    <a href="/listings" class="mt-8 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper">
+      Browse the directory &rarr;
+    </a>
+  </section>
+</BaseLayout>
+
+<script>
+  const business = new URLSearchParams(location.search).get("business");
+  if (business) {
+    const el = document.querySelector("[data-business-suffix]");
+    if (el) el.textContent = ` for ${business}`;
+  }
+</script>

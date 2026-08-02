@@ -1,0 +1,175 @@
+---
+// ADD YOUR BUSINESS — for a business that isn't listed yet.
+//
+// Stays static (the default): nothing here is per-request. It posts to
+// /api/add-business, the one route that actually writes. Errors from a failed
+// POST come back as ?error=... and are shown by a small inline script reading
+// location.search — that keeps this page prerendered HTML rather than pulling
+// it into the on-demand surface just to display a banner.
+//
+// The category field is free text with a datalist suggestion list built from
+// every category in use plus the full configured taxonomy (site.categoryGroups)
+// — so a genuinely new category is not blocked, and the category-hue system in
+// src/lib/categories.ts will assign it a colour automatically either way.
+
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { site } from "../config/site";
+import { TCPA_CONSENT_TEXT } from "../lib/consent";
+import { getListingsByCategory } from "../lib/directory";
+
+const known = new Set(Object.keys(await getListingsByCategory()));
+site.categoryGroups.flatMap((g) => g.categories).forEach((c) => known.add(c));
+const categories = [...known].sort();
+---
+
+<BaseLayout
+  title={`Add your business — ${site.name}`}
+  description={`List your business in ${site.market} for free.`}
+>
+  <section class="mx-auto max-w-xl px-5 py-14">
+    <div class="rule-capped pt-5">
+      <h1 class="font-display text-head">Add your business</h1>
+    </div>
+    <p class="mt-4 max-w-md text-sub text-ink-soft">
+      Free, and it stays free. We'll review your submission and it'll be live shortly.
+    </p>
+
+    <p
+      id="form-error"
+      hidden
+      class="mt-6 border-2 border-signal bg-signal/10 px-4 py-3 text-sm font-semibold text-signal-sunk"
+    ></p>
+
+    <form method="POST" action="/api/add-business" class="mt-8 space-y-5">
+      {/* Honeypot — real visitors never see or fill this in. */}
+      <input
+        type="text"
+        name="hp"
+        tabindex={-1}
+        autocomplete="off"
+        aria-hidden="true"
+        class="absolute -left-[9999px] h-0 w-0 opacity-0"
+      />
+
+      <div>
+        <label for="businessName" class="meta mb-1.5 block">Business name</label>
+        <input
+          id="businessName"
+          name="businessName"
+          type="text"
+          required
+          class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label for="category" class="meta mb-1.5 block">Category</label>
+        <input
+          id="category"
+          name="category"
+          type="text"
+          required
+          list="category-options"
+          class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+        />
+        <datalist id="category-options">
+          {categories.map((c) => <option value={c} />)}
+        </datalist>
+      </div>
+
+      <div>
+        <label for="description" class="meta mb-1.5 block">Description (optional)</label>
+        <textarea
+          id="description"
+          name="description"
+          rows={3}
+          class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+        ></textarea>
+      </div>
+
+      <div>
+        <label for="address" class="meta mb-1.5 block">Address</label>
+        <input
+          id="address"
+          name="address"
+          type="text"
+          required
+          placeholder="Street, city, FL"
+          class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+        />
+      </div>
+
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label for="phone" class="meta mb-1.5 block">Phone</label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+        <div>
+          <label for="website" class="meta mb-1.5 block">Website (optional)</label>
+          <input
+            id="website"
+            name="website"
+            type="url"
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label for="ownerName" class="meta mb-1.5 block">Your name (optional)</label>
+          <input
+            id="ownerName"
+            name="ownerName"
+            type="text"
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+        <div>
+          <label for="email" class="meta mb-1.5 block">Your email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <label class="flex gap-3 border-t-2 border-rule pt-5 text-xs leading-relaxed text-ink-soft">
+        <input type="checkbox" name="tcpaConsent" class="mt-0.5 shrink-0" />
+        <span>{TCPA_CONSENT_TEXT}</span>
+      </label>
+
+      <button
+        type="submit"
+        class="w-full bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk"
+      >
+        Submit for review &rarr;
+      </button>
+    </form>
+  </section>
+</BaseLayout>
+
+<script>
+  const ERRORS: Record<string, string> = {
+    missing: "Please fill in the required fields.",
+    email: "That email address doesn't look right.",
+    server: "Something went wrong on our end — please try again in a moment.",
+  };
+  const error = new URLSearchParams(location.search).get("error");
+  if (error) {
+    const el = document.getElementById("form-error");
+    if (el) {
+      el.textContent = ERRORS[error] ?? ERRORS.server;
+      el.hidden = false;
+    }
+  }
+</script>

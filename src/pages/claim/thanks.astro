@@ -1,0 +1,40 @@
+---
+// Static on purpose — /api/claim redirects here after a successful write, and
+// there is nothing per-request to compute. The business name in the headline
+// comes from a tiny inline script reading ?business= client-side, so the page
+// itself stays plain prerendered HTML.
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+---
+
+<BaseLayout
+  title={`Listing claimed — ${site.name}`}
+  description="Your business listing has been claimed."
+>
+  <section class="mx-auto max-w-xl px-5 py-20 text-center">
+    <p class="meta font-bold text-signal">Claimed</p>
+    <h1 class="font-display mt-3 text-head">
+      You're all set<span data-business-suffix></span>
+    </h1>
+    <p class="mt-4 text-sub text-ink-soft">
+      We've got your details. Update your photos, hours and description any time —
+      just reach out at{" "}
+      <a href={`mailto:${site.contactEmail}`} class="font-bold text-signal">
+        {site.contactEmail}
+      </a>{" "}
+      until self-service editing lands.
+    </p>
+    <a href="/listings" class="mt-8 inline-block bg-ink px-5 py-3 text-sm font-bold text-paper">
+      Back to the directory &rarr;
+    </a>
+  </section>
+</BaseLayout>
+
+<script>
+  const business = new URLSearchParams(location.search).get("business");
+  if (business) {
+    const el = document.querySelector("[data-business-suffix]");
+    if (el) el.textContent = `, ${business}`;
+  }
+</script>

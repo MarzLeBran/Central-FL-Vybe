@@ -26,6 +26,13 @@ export async function getListingBySlug(slug?: string): Promise<Listing | null> {
   return all.find((l) => l.slug === slug) ?? null;
 }
 
+/** Looked up by GHL contact id — this is the token in claim links (`?t=`). */
+export async function getListingById(id?: string): Promise<Listing | null> {
+  if (!id) return null;
+  const all = await getListings();
+  return all.find((l) => l.id === id) ?? null;
+}
+
 /** Every listing on a paid plan — both featured and premium. Top tier first. */
 export async function getFeaturedListings(): Promise<Listing[]> {
   return (await getListings())
@@ -71,6 +78,18 @@ async function fetchFromGHL(): Promise<Listing[]> {
 
 // Maps one GHL contact -> our Listing. Fill the custom-field KEYS with the exact
 // keys you created in Layer 0 (GHL exposes them as an array on the contact).
+//
+// ⚠️ KNOWN GAP, not yet fixed: GHL's contact read responses (GET/search) only
+// return `{ id, value }` per custom field — the human-readable `key` you set in
+// Layer 0 (e.g. "business_name") is NOT included on read, only on write. So
+// `cf()`'s `f.key === key` branch below will never match against a real GHL
+// response; it only works today because DATA_SOURCE=mock reads mock JSON with
+// keys already spelled out. Before flipping DATA_SOURCE=ghl, this needs one of:
+//   (a) call GET /locations/:locationId/customFields once, cache an id->key
+//       map, and resolve `cf()` through it, or
+//   (b) hardcode the field ids you get from Layer 0 directly into this map.
+// The WRITE side (src/lib/submissions.ts) does not have this problem — GHL's
+// update/create endpoints accept `key` directly in the request body.
 function mapContactToListing(c: any): Listing {
   const cf = (key: string) =>
     (c.customFields ?? []).find((f: any) => f.id === key || f.key === key)?.value;
@@ -82,6 +101,7 @@ function mapContactToListing(c: any): Listing {
     category: cf("business_category") ?? "Uncategorized",
     description: cf("business_description") ?? "",
     address: cf("scraped_address") ?? "",
+    county: cf("county") || undefined,
     phone: cf("scraped_phone") ?? c.phone ?? "",
     website: cf("website"),
     rating: num(cf("google_rating")),
@@ -89,12 +109,19 @@ function mapContactToListing(c: any): Listing {
     imageUrls: parseList(cf("image_urls")),
     hours: cf("hours"),
     socialLinks: parseJson(cf("social_links")),
-    planTier: (cf("plan_tier") ?? "free").toLowerCase() === "featured" ? "featured" : "free",
+    planTier: normalizePlanTier(cf("plan_tier")),
     claimStatus: (cf("claim_status") ?? "unclaimed").toLowerCase() as Listing["claimStatus"],
     aiContext: cf("ai_context"),
     agencyClient: String(cf("agency_client")).toLowerCase() === "true",
     clientLocationId: cf("client_location_id") || undefined,
   };
+}
+
+function normalizePlanTier(v: unknown): Listing["planTier"] {
+  const s = String(v ?? "").toLowerCase();
+  if (s === "premium" || s === "all access") return "premium";
+  if (s === "featured" || s === "spotlight") return "featured";
+  return "free";
 }
 
 // ── tiny helpers ─────────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ Create these on **Contacts**. The key is what matters; the label is yours.
 | `business_category` | Text / Dropdown | `category` |
 | `business_description` | Multi-line | `description` |
 | `scraped_address` | Text | `address` |
+| `county` | Dropdown: `Orange` \| `Osceola` \| `Seminole` \| `Lake` \| `Brevard` \| `Volusia` \| `Polk` | `county` — optional; leave blank rather than guess |
 | `scraped_phone` | Phone | `phone` |
 | `listing_slug` | Text | `slug` — URL key, must be unique |
 | `google_rating` | Number | `rating` |
@@ -34,7 +35,7 @@ Create these on **Contacts**. The key is what matters; the label is yours.
 | `image_urls` | Multi-line | `imageUrls` (newline- or comma-separated) |
 | `hours` | Multi-line | `hours` |
 | `social_links` | Multi-line | `socialLinks` (`instagram=https://…` per line) |
-| `plan_tier` | Dropdown: `Free` \| `Featured` | `planTier` |
+| `plan_tier` | Dropdown: `Free` \| `Featured` \| `Premium` | `planTier` — three tiers now (Day Pass / Spotlight / All Access on `/pricing`); `normalizePlanTier()` in `directory.ts` also accepts "Spotlight" and "All Access" as synonyms |
 | `claim_status` | Dropdown: `Unclaimed` \| `Pending` \| `Claimed` | `claimStatus` |
 | `ai_context` | Multi-line | `aiContext` — knowledge for the Featured agent |
 | `agency_client` | Checkbox | `agencyClient` |
@@ -58,6 +59,7 @@ Without them you have no evidence of permission — do not skip them.
 | Tag | Meaning |
 |---|---|
 | `business` | **Makes the contact a listing.** Remove it and the listing disappears. |
+| `new_business_request` | Self-submitted via `/add-business`, **not yet a live listing**. Review in GHL and add `business` yourself to publish it — see Layer 2. |
 | `directory_lead` | Came in via the directory, not yet engaged |
 | `dir_engaged` | Opened/clicked/replied |
 | `dir_claimed` | Claimed their listing — now a hot lead |
@@ -96,6 +98,25 @@ Last Name. If you import a CSV by hand, check that mapping yourself.
 
 On import, choose "add tag to imported contacts" and pick `business` — every row
 becomes a listing in one pass.
+
+## Layer 2 — the write path
+
+`src/lib/submissions.ts` is the mirror of `directory.ts`: same `DATA_SOURCE`
+switch, same env vars. `submitClaim()` updates an existing contact (claim
+form); `submitAddBusiness()` creates a new one tagged `new_business_request`
+— deliberately **not** `business`, so a self-submitted listing stays off the
+live directory until you review it in GHL and tag it `business` yourself.
+
+Both write the four `tcpa_*` fields from above on every submission, consented
+or not — recording that consent was *asked* matters as much as the answer.
+
+**⚠️ Before you flip `DATA_SOURCE=ghl`:** `directory.ts`'s *read* path
+(`mapContactToListing`) has a known unfixed bug — GHL's contact read responses
+only return `{id, value}` per custom field, never the `key` you set above. The
+write path above does not have this problem (GHL's write endpoints accept
+`key` directly), so submissions will work; but listings will read back empty
+until this is fixed. See the comment directly above `mapContactToListing` in
+`src/lib/directory.ts` for the two ways to fix it.
 
 ## Done when
 

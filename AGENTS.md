@@ -67,8 +67,8 @@ Note the boundary: "AI agent for your listing" is an All Access feature on `/pri
 
 ## Build layers (the roadmap)
 - **L0 — GHL foundation** (done by the owner, manual): sub-account, custom fields, tags, API token.
-- **L1 — Front door (NOW):** homepage (hero → deals row → featured row → category tiles → newsletter capture), listings grid, category pages, client-side search (Fuse.js), and listing-detail polish (cover image, socials row, Claimed badge, Google Map embed, hours table).
-- **L2 — Claim + add-business:** claim page (pre-filled + unchecked TCPA consent), add-business form, newsletter capture → all POST to Vercel functions that write to GHL. Admin approves in GHL.
+- **L1 — Front door: done.** Homepage, listings grid, category pages, county pages, client-side search (Fuse.js), pricing, and listing-detail (cover image, socials row, Claimed badge, Google Map embed, hours table).
+- **L2 — Claim + add-business: done.** `/claim` (live lookup by `?t=` listing id, pre-filled, unchecked TCPA consent, already-claimed state) and `/add-business` (static form, free-text category with a datalist of known categories) both POST to on-demand `/api/claim` and `/api/add-business`, which write through `src/lib/submissions.ts`. A claim updates the existing contact; an add-business submission creates one tagged `new_business_request` — **not** `business` — so it stays off the live directory until reviewed. Both record all four `tcpa_*` fields every time, consent given or not. Newsletter capture is not yet built.
 - **L3 — Outreach:** built in GHL (email/SMS honeypot sequence). No front-end work.
 - **L4 — Monetization:** Featured plan/Stripe, **Deals/coupons** system (deal cards on home + on listing → "Get This Deal" links to business site), **Google reviews** import via Places API (agency feature).
 - **L5 — AI agents:** the tiered agents above + outbound "courtesy call" (GHL Voice AI / Vapi) triggered when a consented claim happens.
@@ -82,12 +82,42 @@ Distinctive, not the generic directory template. **Avoid:** warm-cream + serif +
 
 **As built:** near-white paper, oversized display type, flat saturated colour blocking. The signature element is the **category hue** — every category owns one of nine colours (`src/lib/categories.ts`), following it through card marks, index rows, chips and page accents. Assignment hashes the name then probes past collisions across the whole category set, so imported categories get a distinct colour automatically; the three brand hues are used first. Hue classes are authored CSS in `styles/global.css` (`.hue-coral` …) which is why building the class name dynamically is safe. One motion in the system: cards lift on hover, honouring `prefers-reduced-motion`.
 
-## Current status
-**Layer 1 front door is built.** `layouts/BaseLayout.astro` (owns head/SEO, masthead, footer, and the widget routing rule), `config/site.ts` (per-market config — the only file to change for a new city), `components/ListingCard.astro`, home page (masthead → featured row → category index → claim strip), `/listings` grid, `/category/[category]` pages, and a polished listing detail with `LocalBusiness` JSON-LD including `aggregateRating`. Design system lives in `styles/global.css` as Tailwind v4 `@theme` tokens.
+## Current status (as of this session — read this first)
 
-`npm run import -- file.csv` seeds `data/mock-listings.json` **and** emits a GHL-ready contact CSV (`out/ghl-import.csv`) — see `docs/ghl-layer-0.md` for the GHL side and the First Name trap.
+**L1 (front door) and L2 (claim + add-business) are both built and functionally tested. L1 is committed; L2 is NOT.**
 
-**Next:** client-side search (Fuse.js, not yet installed), then Layer 2 claim + add-business.
+### ⚠️ Uncommitted work — check this before doing anything else
+```
+git status --short
+```
+will show the whole L2 feature sitting uncommitted on top of commit `9745e15`:
+new: `src/lib/consent.ts`, `src/lib/submissions.ts`, `src/pages/claim.astro`, `src/pages/claim/thanks.astro`, `src/pages/add-business.astro`, `src/pages/add-business/thanks.astro`, `src/pages/api/claim.ts`, `src/pages/api/add-business.ts`;
+modified: `astro.config.mjs` (adapter), `src/lib/directory.ts` (`getListingById`, county + 3-tier fixes to `mapContactToListing`), `src/config/site.ts`, `src/components/SiteHeader.astro`, `src/pages/index.astro` (CTA links), `docs/ghl-layer-0.md`, `.gitignore`, `package.json`/`package-lock.json` (`@astrojs/vercel`, `fuse.js` was already committed with L1).
+**Nobody has been asked to commit this yet — it is real, tested, working code just sitting in the working tree.** Decide whether to commit before starting new work; don't let a context reset or a stray `git checkout` be the first time this gets lost.
+
+### What L1 shipped (committed)
+Homepage, `/listings`, `/category/[category]`, `/county/[county]` + `/county/[county]/[category]` (all seven counties: Orange, Osceola, Seminole, Lake, Brevard, Volusia, Polk), `/pricing` (three tiers), and listing detail — all on `layouts/BaseLayout.astro`, which owns `<head>`/SEO, the header, footer, and the widget-routing rule. Client-side search is live (Fuse.js, dynamic-imported, `/search-index.json` built at compile time). Category colour system in `src/lib/categories.ts`. Brand assets from the logo, CSV importer (`npm run import -- file.csv`) that seeds mock data and emits a GHL-ready CSV.
+
+### What L2 shipped (uncommitted, tested)
+- **`/claim?t={contactId}`** — server-rendered on demand (`export const prerender = false`), live-looks-up the listing, shows one of: the pre-filled claim form, an "already claimed" state, or a "couldn't find that listing" state. Owner name, **phone (required)**, email, unchecked TCPA consent (exact wording in `src/lib/consent.ts`), honeypot field. POSTs to `/api/claim`.
+- **`/add-business`** — stays static; free-text category field with a `<datalist>` built at build time from every category already in use plus the full configured taxonomy. POSTs to `/api/add-business`.
+- **`src/lib/submissions.ts`** — the write-side mirror of `directory.ts`'s `DATA_SOURCE` pattern. Mock mode logs every submission to `out/dev-submissions.jsonl` (gitignored). GHL mode is fully written (not a stub) against the documented GHL v2 contact API: `submitClaim` PUTs the existing contact and adds tags via the dedicated tags endpoint (never overwrites the `tags` array, which would silently un-tag `business`); `submitAddBusiness` POSTs a new contact tagged `new_business_request` — **deliberately not `business`**, so it stays off the live directory until an admin reviews it in GHL and tags it themselves. Both write all four `tcpa_*` fields every time, consent given or not.
+- Both endpoints validate server-side (required fields, email regex, already-claimed guard) independent of the browser, redirect with `?error=<code>` on failure, and redirect to a thanks page on success. Both have a honeypot (`name="hp"`, hidden off-screen, not `display:none`) — a tripped honeypot redirects to the *same* thanks page a real success gets, so nothing in the response teaches a bot what caught it. **No reCAPTCHA yet** — needs a Google site/secret key pair this project doesn't have.
+- Astro's default CSRF protection (`security.checkOrigin`) will 403 a bare `curl` POST with no `Origin` header — that's correct, wanted behavior, not a bug. A real browser form submission always includes it.
+
+### Two real bugs found and fixed this session (not just written and left)
+1. **Widget-rule violation I introduced myself**: all four new L2 pages defensively had `widget="none"`. The actual rule (below) is "all non-listing pages get the directory-wide assistant" — claim/add-business are non-listing pages. Fixed; verified 28/28 pages carry exactly one widget.
+2. **A latent read-path bug in `directory.ts`** discovered by checking current GHL API docs rather than assuming: GHL's contact read responses only return `{id, value}` per custom field — never the `key` you set in Layer 0. `mapContactToListing`'s `cf()` helper matches on `key`, which will silently return nothing once `DATA_SOURCE=ghl` is real. **Not fixed yet** — flagged with a prominent comment in `directory.ts` right above the function. Needs either (a) one `GET /locations/:locationId/customFields` call cached to build an id→key map, or (b) hardcoding field ids once you have them from Layer 0. The write path (`submissions.ts`) does not have this problem — GHL's write endpoints accept `key` directly.
+
+### How this was verified (repeatable, not just asserted)
+Dev server on port 4322 (may already be running — `npx astro dev status` first). Every claim/add-business path was curl-tested against it with `-H "Origin: http://localhost:4322"` (required, see CSRF note above): happy path, missing fields, bad email, already-claimed, nonexistent listing, honeypot. Confirmed via `cat out/dev-submissions.jsonl` that mock writes capture every field including `ip` and `consentVersion`. Full-tree checks after every change: `npm run build`, then a widget-rule sweep (`grep -c` for each widget marker across every `dist/**/*.html`, must sum to exactly 1) and a broken-internal-link sweep (`dist/client/` is the adapter's static output root, not bare `dist/`).
+
+### Next (not yet decided — pick one)
+- **Commit L2** (see the uncommitted-work note above — do this first, regardless of what's next).
+- **L3 (outreach)** is GHL workflows only — no front-end code to write; requires Layer 0 (owner's manual GHL setup) to exist first.
+- **L4 (monetization)**: Stripe checkout behind the `/pricing` "Upgrade now"/"Add your business" CTAs, which currently point at real pages but don't charge anyone yet.
+- **L5 (AI agents)**: the per-listing agent widget already routes correctly (`hasListingAgent()`), but `ListingAgentWidget.astro` has no real backend yet.
+- **Tighten `/claim`'s token**: `?t=` is today the raw GHL contact id. Fine for testing; a real claim link should carry an unguessable token minted by the Layer 3 outreach email before real outreach goes out.
 
 ---
 
@@ -109,14 +139,16 @@ Manage the background server with `astro dev stop`, `astro dev status`, and `ast
 | `npm run build` | Production build to `./dist/` |
 | `npm run preview` | Preview the production build locally |
 | `npm run astro check` | Typecheck — **requires `npm i -D @astrojs/check typescript` first**; neither is currently a dependency, so the command prompts to install them |
+| `npm run import -- file.csv` | Seed `data/mock-listings.json` from a scraped CSV and emit a GHL-ready import CSV to `out/`. See `docs/ghl-layer-0.md`. |
 
 **There is no lint, test, or formatter tooling in this repo, and no typechecker installed.** `npm run build` is the only verification step that works out of the box — don't assume a test runner exists or invent commands for one.
 
 ## Repo facts (discovered from config, not obvious from any single file)
 
 - **Tailwind v4, and there is no config file.** Wired via `@tailwindcss/vite` in `astro.config.mjs` plus `@import "tailwindcss";` in `src/styles/global.css`. Do **not** create `tailwind.config.js` — v4 is CSS-first; customize with `@theme` inside `global.css`.
-- **No shared layout yet.** Every page hand-rolls its own `<html>`, and `global.css` is imported per-page (currently only in `pages/business/[slug].astro` — `index.astro` does not import it). A `src/layouts/` base layout is the natural first move in Layer 1; otherwise each new page must remember the stylesheet import.
-- **Static-only today.** `astro.config.mjs` sets no `output` mode and no adapter, so the build is pure SSG. Layer 2's Vercel functions will require adding `@astrojs/vercel` and switching output mode — that's a real config change, not just new files.
-- **Fuse.js is not installed.** Layer 1 search will need it added.
-- **`.env` is gitignored and there is no `.env.example`.** A fresh clone has no `.env`; `directory.ts` falls back to `"mock"`, so it still builds and runs.
+- **Every page uses `layouts/BaseLayout.astro`.** It owns `<head>`/SEO tags, the header, the footer, and the widget-routing rule (`widget` prop, default `"directory"`). A new page should almost never hand-roll `<html>` — wrap it in `BaseLayout` instead, or the widget rule silently breaks (see the bug note in Current Status above).
+- **Hybrid, not pure static.** `astro.config.mjs` now carries `adapter: vercel()`, added for Layer 2. Deliberately **no `output: 'server'`** — the default `'static'` mode still prerenders everything, and the adapter only enables `export const prerender = false` on the specific routes that need it: `/claim` (needs a live per-request listing lookup) and the two `/api/*` write endpoints. Every listing/category/county page stays static HTML. Adding a new on-demand route means adding that export; it does not change how anything else builds.
+- **Astro's CSRF protection is on by default** (`security.checkOrigin`, true since Astro v5) and will 403 any POST whose `Origin` doesn't match the request host — this is why `curl`-ing `/api/claim` needs an explicit `-H "Origin: ..."` to test, while a real `<form method="POST">` from a browser works with no extra config. Do not set `security.checkOrigin: false` to make testing easier; that removes real protection on routes that write to GHL.
+- **Anti-spam today is a honeypot only**, not reCAPTCHA — wiring reCAPTCHA needs a Google site/secret key pair this project doesn't have yet. Both forms have a `name="hp"` field hidden off-screen (not `display:none`, which some bots skip); a filled value redirects to the same success page a real submission gets, so nothing in the response teaches a bot what tripped it.
+- **`.env` exists locally** (gitignored, not committed) and currently holds just `DATA_SOURCE=mock`. There is no `.env.example`. A fresh clone with no `.env` still builds and runs, since `directory.ts` falls back to `"mock"`.
 - **`README.md` is still the stock Astro minimal-starter boilerplate** and does not describe this project — don't treat it as a source of truth.
