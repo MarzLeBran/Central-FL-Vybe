@@ -10,14 +10,29 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "import": "node scripts/import-listings.mjs",
-    "reviews": "node scripts/import-reviews.mjs"
+    "import": "node --env-file=.env scripts/import-listings.mjs",
+    "reviews": "node --env-file=.env scripts/import-reviews.mjs",
+    "find-businesses": "node --env-file=.env scripts/find-businesses.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@astrojs/vercel": "^11.0.4",
     "@tailwindcss/vite": "^4.3.3",
+    "@tinacms/astro": "^0.6.1",
     "astro": "^7.1.6",
     "fuse.js": "^7.5.0",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "tinacms": "^3.11.0"
+  },
+  "devDependencies": {
+    "@tinacms/cli": "^2.5.6"
+  },
+  "allowScripts": {
+    "esbuild@0.24.2": true,
+    "esbuild@0.18.20": true,
+    "esbuild@0.28.1": true,
+    "better-sqlite3@12.11.1": true,
+    "core-js@3.49.0": true,
+    "fsevents@2.3.3": true
   }
 }
