@@ -42,11 +42,11 @@ const channels = site.channels.filter((c) => c.url);
     <div class="absolute inset-0 flex items-center">
       <div class="mx-auto w-full max-w-3xl px-5 text-center">
         <h1
-          class="on-photo font-display text-3xl font-extrabold tracking-tight text-paper sm:whitespace-nowrap sm:text-4xl lg:text-5xl"
+          class="on-photo font-display text-3xl font-extrabold tracking-tight text-on-photo sm:whitespace-nowrap sm:text-4xl lg:text-5xl"
         >
           Find {site.market} Businesses
         </h1>
-        <p class="on-photo mt-3 text-base text-paper sm:text-lg">
+        <p class="on-photo mt-3 text-base text-on-photo sm:text-lg">
           Search by name, category, city or keyword
         </p>
 
@@ -54,7 +54,7 @@ const channels = site.channels.filter((c) => c.url);
           <SearchBox id="hero-search" />
         </div>
 
-        <p class="on-photo meta mt-4 text-paper">
+        <p class="on-photo meta mt-4 text-on-photo">
           {listings.length} businesses &middot; {categories.length} categories &middot; free to be listed
         </p>
       </div>

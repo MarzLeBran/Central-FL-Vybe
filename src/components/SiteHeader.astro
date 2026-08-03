@@ -189,6 +189,21 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
           </div>
         )
       }
+      <button
+        type="button"
+        data-theme-toggle
+        aria-label="Switch between light and dark theme"
+        class="flex size-9 shrink-0 items-center justify-center border-2 border-ink text-ink hover:border-signal hover:text-signal"
+      >
+        <svg data-icon="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="size-4" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+        </svg>
+        <svg data-icon="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+        </svg>
+      </button>
+
       <a
         href="/add-business"
         class="shrink-0 whitespace-nowrap border-2 border-ink bg-ink px-3 py-2 text-xs font-bold text-paper hover:border-signal hover:bg-signal sm:px-4 sm:text-sm"
@@ -230,5 +245,22 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
         .querySelectorAll<HTMLDetailsElement>("[data-navgroup][open]")
         .forEach((d) => (d.open = false));
     }
+  });
+
+  // Theme toggle. The initial theme itself is set by a blocking inline
+  // script in BaseLayout's <head> (before paint); this just handles clicks
+  // and keeps aria-pressed in sync, both here and on any other header
+  // instance on the page (there's only ever one, but querySelectorAll is
+  // cheap insurance against that assumption changing).
+  document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]").forEach((toggle) => {
+    const sync = () =>
+      toggle.setAttribute("aria-pressed", String(document.documentElement.dataset.theme === "dark"));
+    sync();
+    toggle.addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem("theme", next);
+      sync();
+    });
   });
 </script>

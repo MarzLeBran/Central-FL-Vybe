@@ -34,6 +34,12 @@
   --color-signal: #ee5a3c;
   --color-signal-sunk: #c8412a;
 
+  /* Deliberately NOT theme-aware: text sitting directly on a photo (paired
+     with .on-photo's shadow) needs to stay light in both themes, since the
+     photo doesn't change. Using --color-paper for this would tie it to the
+     page surface colour, which does flip in dark mode. */
+  --color-on-photo: #fafaf7;
+
   /* Type — heavy grotesque display, monospace metadata */
   --font-display: "Helvetica Neue", Inter, ui-sans-serif, system-ui, sans-serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -55,6 +61,26 @@
   --text-meta: 0.6875rem;
   --text-meta--line-height: 1.4;
   --text-meta--letter-spacing: 0.1em;
+}
+
+/* ── Dark theme ────────────────────────────────────────────────────────────
+   Opt-in via [data-theme="dark"] on <html> (BaseLayout's inline head script
+   sets it from localStorage, falling back to prefers-color-scheme; the
+   toggle in SiteHeader flips + persists it). Not a generic near-black — the
+   surface is the brand's own deep teal-navy ink, darkened, with the light
+   theme's paper cream repurposed as the dark theme's ink. Same two brand
+   colours, inverted, rather than a bolted-on neutral-grey dark mode. */
+[data-theme="dark"] {
+  --color-paper: #0d2329;
+  --color-paper-sunk: #14343c;
+  --color-rule: #2a4d55;
+
+  --color-ink: #f5f2ea;
+  --color-ink-soft: #b7c8cb;
+  --color-ink-mute: #6f8b90;
+
+  --color-signal: #ee5a3c;
+  --color-signal-sunk: #ff8a70;
 }
 
 @layer base {
@@ -112,6 +138,21 @@
   .hue-orchid   { --h: #a8559e; --h-ink: #fafaf7; --h-deep: #78306f; }
   .hue-deep     { --h: #17414b; --h-ink: #fafaf7; --h-deep: #17414b; }
 
+  /* --h-deep is calibrated to read as text on the LIGHT paper — against dark
+     paper it needs to lighten instead of darken, or (for .hue-deep, whose
+     light-mode --h-deep IS the ink colour) it would vanish into the new dark
+     surface entirely. --h and --h-ink (solid hue-block fills) stay the same
+     in both themes; a filled colour block doesn't need to change. */
+  [data-theme="dark"] .hue-coral    { --h-deep: #ff8a70; }
+  [data-theme="dark"] .hue-sun      { --h-deep: #ffcf5c; }
+  [data-theme="dark"] .hue-lagoon   { --h-deep: #5be0d3; }
+  [data-theme="dark"] .hue-flamingo { --h-deep: #ff85ac; }
+  [data-theme="dark"] .hue-mango    { --h-deep: #ffab5c; }
+  [data-theme="dark"] .hue-surf     { --h-deep: #6fd0ff; }
+  [data-theme="dark"] .hue-lime     { --h-deep: #c3e878; }
+  [data-theme="dark"] .hue-orchid   { --h-deep: #e08ad6; }
+  [data-theme="dark"] .hue-deep     { --h-deep: #eaf3f2; }
+
   /* Apply the hue */
   .hue-block {
     background: var(--h, var(--color-signal));
@@ -153,6 +194,15 @@
     color: var(--color-ink-mute);
   }
 
+  /* .meta's own muted grey reads fine on paper, but it's the wrong colour
+     sitting on a solid hue-block (pricing's plan badges, the "Upgrade"
+     nudge on a listing page) — it needs the block's own ink, not the
+     page's. Two classes beats .meta's one, so this wins regardless of
+     which rule comes first in the file. */
+  .hue-block .meta {
+    color: inherit;
+  }
+
   /* Solid chip — categories, badges, channel links */
   .chip {
     display: inline-flex;
@@ -187,6 +237,18 @@
   .js [data-reveal].is-in {
     opacity: 1;
     transform: none;
+  }
+
+  /* Theme toggle — two SVGs in the button, CSS picks which one shows so the
+     icon always matches [data-theme] with no extra JS and no mismatch flash. */
+  [data-theme-toggle] [data-icon="moon"] {
+    display: none;
+  }
+  [data-theme="dark"] [data-theme-toggle] [data-icon="sun"] {
+    display: none;
+  }
+  [data-theme="dark"] [data-theme-toggle] [data-icon="moon"] {
+    display: block;
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -62,6 +62,19 @@ const channels = site.channels.filter((c) => c.url);
     <meta name="twitter:image" content={new URL(site.ogImage, site.origin).href} />
     <meta name="generator" content={Astro.generator} />
     <script is:inline>
+      // Sets the theme before first paint — must run here, not in a deferred
+      // component script, or the page flashes light before switching to a
+      // saved dark preference. Explicit choice (SiteHeader's toggle) wins;
+      // otherwise falls back to the OS preference.
+      const storedTheme = localStorage.getItem("theme");
+      document.documentElement.dataset.theme =
+        storedTheme === "light" || storedTheme === "dark"
+          ? storedTheme
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+    </script>
+    <script is:inline>
       // Marks that JS is available, so the reveal animation can safely start
       // tiles hidden. Without this class they stay visible — no blank page if
       // the bundle fails.

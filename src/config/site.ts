@@ -126,12 +126,14 @@ export const site = {
 
   /**
    * Brand assets in `public/`. All were generated from the originals kept in
-   * `brand/` (see docs/brand-assets.md) — 21 MB of source PNGs down to ~950 KB
+   * `brand/` (see docs/brand-assets.md) — 21 MB of source PNGs down to ~1 MB
    * of web-ready files. Leave `logo` empty and the header falls back to type.
+   * The two lockups are true vector SVGs with a transparent background — no
+   * white plate behind them, so they sit cleanly on the dark theme too.
    */
-  logo: "/logo.png",
+  logo: "/logo.svg",
   logoAlt: "Central FL Vybe",
-  logoTagline: "/logo-tagline.png",
+  logoTagline: "/logo-tagline.svg",
 
   /** Home page hero. Two widths; the browser picks via srcset. */
   hero: {
@@ -144,7 +146,7 @@ export const site = {
   ogImage: "/og-image.jpg",
 
   /** Shown on a listing tile that has no photos of its own. */
-  fallbackImage: "/logo-tagline.png",
+  fallbackImage: "/logo-tagline.svg",
 
   /**
    * DIRECTORY PLANS — what a business can buy on the directory itself.
