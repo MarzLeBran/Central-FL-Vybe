@@ -32,13 +32,32 @@ export function countyBySlug(slug: string): (typeof site.counties)[number] | und
  * first, so "West Melbourne" beats "Melbourne" and "Cocoa Beach" beats "Cocoa".
  */
 export function countyForAddress(address: string): string | undefined {
-  const haystack = address.toLowerCase();
   const candidates = site.counties.flatMap((c) => [
     { needle: `${c.name.toLowerCase()} county`, county: c.name },
     ...c.cities.map((city) => ({ needle: city.toLowerCase(), county: c.name })),
   ]);
   candidates.sort((a, b) => b.needle.length - a.needle.length);
-  return candidates.find(({ needle }) => haystack.includes(needle))?.county;
+
+  const haystack = address.toLowerCase();
+
+  // "<County> County" phrasing (no street/city at all) is always checked
+  // against the whole string — it can't collide with a street name the way a
+  // bare city name can.
+  const countyPhraseHit = candidates.find(
+    ({ needle }) => needle.endsWith(" county") && haystack.includes(needle)
+  );
+  if (countyPhraseHit) return countyPhraseHit.county;
+
+  // Isolate the actual city from "..., City, ST 12345[, Country]" rather than
+  // substring-matching the whole address — otherwise a street name that
+  // happens to contain another city's name (e.g. "S Orlando Dr" in Sanford)
+  // gets misread as the city itself. Falls back to the whole string for
+  // addresses that don't have this shape.
+  const cityMatch = address.match(/,\s*([^,]+?),\s*[A-Z]{2}\s*\d{5}/);
+  const cityHaystack = (cityMatch ? cityMatch[1] : haystack).toLowerCase();
+  return candidates.find(
+    ({ needle }) => !needle.endsWith(" county") && cityHaystack.includes(needle)
+  )?.county;
 }
 
 /** Listings grouped by county. Counties with nothing in them are omitted. */

@@ -17,16 +17,35 @@
 //   node scripts/import-listings.mjs businesses.csv
 //   node scripts/import-listings.mjs businesses.csv --merge
 //   node scripts/import-listings.mjs businesses.csv --featured "Clean Lab by EZ,Hometown Pizza Co"
+//   node scripts/import-listings.mjs businesses.csv --premium "Name A" --featured "Name B,Name C"
+//   node scripts/import-listings.mjs businesses.csv --no-ai-descriptions
 //
 // Flags:
-//   --merge      keep existing listings, add only slugs that aren't there yet
-//   --featured   comma-separated business names to mark planTier=featured
-//   --dry        print what would happen, write nothing
+//   --merge              keep existing listings, add only slugs that aren't there yet
+//   --featured           pipe/comma-separated business names to mark planTier=featured
+//   --premium            pipe/comma-separated business names to mark planTier=premium
+//                        (wins over --featured if a name is in both lists)
+//   --no-ai-descriptions skip AI description generation even if ANTHROPIC_API_KEY is set
+//   --dry                print what would happen, write nothing
+//
+// AEO descriptions: every listing needs a real, answer-engine-optimized
+// description, not filler — see docs/ghl-layer-0.md's note on why the old
+// "$name serves the local area." placeholder isn't good enough to publish.
+// Any row that arrives with NO description (the common case — Google's Text
+// Search doesn't return one; see scripts/find-businesses.mjs) gets one
+// written by Claude from only the verified facts on hand: business name,
+// category, city/county, and Google's own category tags when present (never
+// invented specifics — no fake specialties, years in business, or awards). A
+// row that already carries a real description (hand-curated CSV, a business
+// that filled out /add-business) is left alone. Requires ANTHROPIC_API_KEY;
+// falls back to the old generic placeholder if it's unset, never blocks the
+// import either way.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import Anthropic from "@anthropic-ai/sdk";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LISTINGS_JSON = resolve(ROOT, "src/data/mock-listings.json");
@@ -40,16 +59,23 @@ const dry = args.includes("--dry");
 // Business names contain commas ("Bella's Empanadas, Co."), so prefer a pipe
 // separator and fall back to commas only when there is no pipe. A `featured`
 // column in the CSV is more reliable than either — see ALIASES below.
-const featuredRaw = args.includes("--featured") ? (args[args.indexOf("--featured") + 1] ?? "") : "";
-const featuredNames = new Set(
-  featuredRaw
-    .split(featuredRaw.includes("|") ? "|" : ",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean)
-);
+function namesFromFlag(flag) {
+  const raw = args.includes(flag) ? (args[args.indexOf(flag) + 1] ?? "") : "";
+  return new Set(
+    raw
+      .split(raw.includes("|") ? "|" : ",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+const featuredNames = namesFromFlag("--featured");
+const premiumNames = namesFromFlag("--premium");
+const noAiDescriptions = args.includes("--no-ai-descriptions");
 
 if (!csvPath) {
-  console.error("usage: node scripts/import-listings.mjs <file.csv> [--merge] [--featured \"A,B\"] [--dry]");
+  console.error(
+    'usage: node scripts/import-listings.mjs <file.csv> [--merge] [--featured "A,B"] [--premium "C,D"] [--dry]'
+  );
   process.exit(1);
 }
 
@@ -104,8 +130,28 @@ const COUNTY_NEEDLES = Object.entries(COUNTIES)
   .sort((a, b) => b.needle.length - a.needle.length);
 
 function countyForAddress(address) {
-  const hay = String(address ?? "").toLowerCase();
-  return COUNTY_NEEDLES.find(({ needle }) => hay.includes(needle))?.county;
+  const raw = String(address ?? "");
+  const hay = raw.toLowerCase();
+
+  // "<County> County" phrasing (scraped rows with no street/city at all) is
+  // always checked against the whole string — it can't collide with a street
+  // name the way a bare city name can.
+  const countyPhraseHit = COUNTY_NEEDLES.find(
+    ({ needle }) => needle.endsWith(" county") && hay.includes(needle)
+  );
+  if (countyPhraseHit) return countyPhraseHit.county;
+
+  // Isolate the actual city from "..., City, ST 12345[, Country]" rather than
+  // substring-matching the whole address — otherwise a street name that
+  // happens to contain another city's name (e.g. "S Orlando Dr" in Sanford)
+  // gets misread as the city itself. Falls back to the whole string for
+  // addresses that don't have this shape (best effort, matches the old
+  // behaviour only in that narrower case).
+  const cityMatch = raw.match(/,\s*([^,]+?),\s*[A-Z]{2}\s*\d{5}/);
+  const cityHay = (cityMatch ? cityMatch[1] : hay).toLowerCase();
+  return COUNTY_NEEDLES.find(
+    ({ needle }) => !needle.endsWith(" county") && cityHay.includes(needle)
+  )?.county;
 }
 
 const ALIASES = {
@@ -121,6 +167,8 @@ const ALIASES = {
   email: ["email", "email address"],
   featured: ["featured", "tier", "plan tier", "plan_tier"],
   county: ["county"],
+  placeId: ["place id", "google place id", "placeid"],
+  googleTypes: ["google types", "types"],
 };
 
 /** A `featured` column beats the --featured flag: no comma-escaping problems. */
@@ -147,6 +195,92 @@ function slugify(s) {
 function num(v) {
   const n = Number.parseFloat(String(v ?? "").replace(/[^0-9.]/g, ""));
   return Number.isFinite(n) ? n : undefined;
+}
+
+const GENERIC_DESCRIPTION = (name) => `${name} serves the local area.`;
+
+// ── AEO description generation ────────────────────────────────────────────────
+// One short Claude call per listing that's missing a real description. Kept
+// deliberately simple (single call, no tools, no thinking needed) — this is
+// exactly a "generate short copy from a few verified facts" task, not
+// anything requiring multi-step reasoning.
+async function writeAeoDescription(client, listing) {
+  const cityMatch = String(listing.address ?? "").match(/,\s*([^,]+?),\s*[A-Z]{2}\s*\d{5}/);
+  const city = cityMatch ? cityMatch[1] : undefined;
+  const location = [city, listing.county && `${listing.county} County`].filter(Boolean).join(", ");
+
+  const facts = [
+    `Business name: ${listing.businessName}`,
+    `Category: ${listing.category}`,
+    location && `Location: ${location}, Florida`,
+    listing._googleTypes &&
+      `Google's own category tags for this business: ${listing._googleTypes.split(";").join(", ")}`,
+  ].filter(Boolean).join("\n");
+
+  const response = await client.messages.create({
+    model: "claude-opus-5",
+    max_tokens: 300,
+    output_config: { effort: "low" },
+    system: [
+      "You write short local-business directory descriptions optimized for answer",
+      "engines (AEO) — clear, factual copy that a voice assistant or an AI search",
+      'summary can quote directly to answer "is there a [category] in [city]" or',
+      '"what does [business] do".',
+      "",
+      "Rules:",
+      "1. One to two plain sentences. No headings, no marketing fluff, no emoji, no",
+      "   surrounding quotation marks.",
+      "2. State what kind of business it is and where it's located, clearly and near",
+      "   the start.",
+      "3. Use ONLY the facts given below. Never invent specialties, years in business,",
+      "   awards, certifications, staff names, or customer testimonials that weren't",
+      "   provided.",
+      "4. If the only facts available are the name, category, and location, write a",
+      "   plain, honest description of that category of business in that location —",
+      '   don\'t pad it with vague unearned superlatives ("top-rated", "trusted",',
+      '   "premier").',
+      "5. Output only the description text, nothing else.",
+    ].join("\n"),
+    messages: [{ role: "user", content: facts }],
+  });
+
+  const text = response.content.find((b) => b.type === "text")?.text?.trim();
+  if (!text) throw new Error("empty response");
+  return text;
+}
+
+async function generateAeoDescriptions(items, { skip }) {
+  const targets = items.filter((l) => l._needsDescription);
+  if (!targets.length) return;
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (skip || !apiKey) {
+    if (!skip) {
+      console.log(`\nnote: ANTHROPIC_API_KEY not set — ${targets.length} listing(s) got the generic`);
+      console.log(`      placeholder description instead of an AEO-optimized one.`);
+    }
+    for (const l of targets) l.description = GENERIC_DESCRIPTION(l.businessName);
+    return;
+  }
+
+  const client = new Anthropic({ apiKey });
+  console.log(`\nWriting AEO descriptions for ${targets.length} listing(s) via Claude...`);
+
+  const CONCURRENCY = 5;
+  for (let i = 0; i < targets.length; i += CONCURRENCY) {
+    const batch = targets.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      batch.map(async (l) => {
+        try {
+          l.description = await writeAeoDescription(client, l);
+        } catch (err) {
+          console.error(`  ${l.businessName}: generation failed (${err.message}) — using fallback`);
+          l.description = GENERIC_DESCRIPTION(l.businessName);
+        }
+      })
+    );
+    console.error(`  ${Math.min(i + CONCURRENCY, targets.length)}/${targets.length}`);
+  }
 }
 
 // ── read ─────────────────────────────────────────────────────────────────────
@@ -187,15 +321,26 @@ for (const row of rows.slice(1)) {
 
   const rating = num(get(row, "rating"));
   const reviewCount = num(get(row, "reviewCount"));
+  // A name on --premium/--featured wins regardless of the CSV; otherwise the
+  // row's own `featured` column can spell out the tier directly ("Premium"/
+  // "All Access" vs "Featured"/"Spotlight"/yes/true/1 — see isTruthy above).
+  const featuredCell = get(row, "featured").trim().toLowerCase();
+  const isPremium =
+    premiumNames.has(businessName.toLowerCase()) ||
+    ["premium", "all access"].includes(featuredCell);
   const isFeatured =
-    isTruthy(get(row, "featured")) || featuredNames.has(businessName.toLowerCase());
+    !isPremium &&
+    (featuredNames.has(businessName.toLowerCase()) || isTruthy(featuredCell));
+  const planTier = isPremium ? "premium" : isFeatured ? "featured" : "free";
+
+  const rawDescription = get(row, "description");
 
   imported.push({
     id: `c_${slug}`,
     slug,
     businessName,
     category: get(row, "category") || "Uncategorised",
-    description: get(row, "description") || `${businessName} serves the local area.`,
+    description: rawDescription || undefined, // filled in below if empty
     address: get(row, "address"),
     county: county || undefined,
     phone: get(row, "phone"),
@@ -205,18 +350,36 @@ for (const row of rows.slice(1)) {
     imageUrls: [],
     hours: undefined,
     socialLinks: undefined,
-    planTier: isFeatured ? "featured" : "free",
+    planTier,
     claimStatus: "unclaimed",
-    aiContext: isFeatured ? `${businessName}. ${get(row, "description")}`.trim() : undefined,
+    // Only Premium gets a per-listing AI agent (hasListingAgent() in
+    // src/types/listing.ts) — Featured doesn't need this filled in.
+    aiContext: isPremium ? `${businessName}. ${rawDescription}`.trim() : undefined,
     agencyClient: false,
     clientLocationId: undefined,
+    placeId: get(row, "placeId") || undefined,
     _ownerName: get(row, "ownerName") || undefined,
     _email: get(row, "email") || undefined,
+    _needsDescription: !rawDescription,
+    _googleTypes: get(row, "googleTypes") || undefined,
   });
 }
 
+await generateAeoDescriptions(imported, { skip: noAiDescriptions });
+
+// aiContext was computed before generation filled in `description` for rows
+// that arrived without one — backfill it now so Premium's per-listing AI
+// agent gets the real description too, not an empty one.
+for (const l of imported) {
+  if (l.planTier === "premium" && l._needsDescription) {
+    l.aiContext = `${l.businessName}. ${l.description}`.trim();
+  }
+}
+
 // Strip the import-only fields before they reach the app's data contract.
-const listings = [...existing, ...imported].map(({ _ownerName, _email, ...l }) => l);
+const listings = [...existing, ...imported].map(
+  ({ _ownerName, _email, _needsDescription, _googleTypes, ...l }) => l
+);
 
 // ── GHL contact CSV ──────────────────────────────────────────────────────────
 const esc = (v) => {
@@ -228,7 +391,8 @@ const GHL_HEADER = [
   "First Name", "Last Name", "Email", "Phone", "Website",
   "business_name", "business_category", "business_description",
   "scraped_address", "county", "scraped_phone", "listing_slug",
-  "google_rating", "google_review_count", "plan_tier", "claim_status", "Tags",
+  "google_rating", "google_review_count", "google_place_id", "ai_context",
+  "plan_tier", "claim_status", "Tags",
 ];
 
 const ghlRows = imported.map((l) => [
@@ -246,13 +410,16 @@ const ghlRows = imported.map((l) => [
   l.slug,
   l.rating ?? "",
   l.reviewCount ?? "",
-  l.planTier === "featured" ? "Featured" : "Free",
+  l.placeId ?? "",
+  l.aiContext ?? "",
+  l.planTier === "premium" ? "Premium" : l.planTier === "featured" ? "Featured" : "Free",
   "Unclaimed",
   "business",                  // the tag that turns a contact into a listing
 ]);
 
 // ── write ────────────────────────────────────────────────────────────────────
 const featuredCount = listings.filter((l) => l.planTier === "featured").length;
+const premiumCount = listings.filter((l) => l.planTier === "premium").length;
 
 if (dry) {
   console.log(`[dry run] nothing written`);
@@ -267,7 +434,7 @@ if (dry) {
 
 console.log(`imported   ${imported.length}`);
 if (skipped) console.log(`skipped    ${skipped} (slug already present, --merge)`);
-console.log(`total      ${listings.length} listings, ${featuredCount} featured`);
+console.log(`total      ${listings.length} listings, ${premiumCount} premium, ${featuredCount} featured`);
 if (!dry) {
   console.log(`wrote      src/data/mock-listings.json`);
   console.log(`wrote      out/ghl-import.csv  (First Name = business name)`);

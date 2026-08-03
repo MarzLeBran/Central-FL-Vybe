@@ -1,8 +1,8 @@
 # Google APIs — what's free, what bills
 
-Two Google products touch this directory and they sit at opposite ends of the
-pricing model. Getting them the wrong way round is how a directory quietly runs
-up a four-figure monthly bill.
+Three Google products touch this directory and they sit at very different
+points on the pricing model. Getting them the wrong way round is how a
+directory quietly runs up a four-figure monthly bill.
 
 ## Maps — free, use it everywhere
 
@@ -28,6 +28,47 @@ nothing to give away. Do not add a "Google map on listing" row to
 Note the exception: a **dynamic** map — the Maps JavaScript API, e.g. a homepage
 map with a pin per business — *is* billed under Essentials, free for the first
 10,000 loads a month. That is a different product from the embed.
+
+## Sourcing real listings — Text Search, ~$35 per 1,000 requests
+
+Scraping Google Maps directly violates its Terms of Service. Places API
+**Text Search (New)** is the legitimate way to turn "restaurants in Orlando
+FL" into a list of real businesses — it's what backs
+[`scripts/find-businesses.mjs`](../scripts/find-businesses.mjs).
+
+Like Place Details, Text Search bills on whichever field pushes it to the
+highest SKU. Requesting `nationalPhoneNumber`/`websiteUri` (needed to fill
+out a usable listing) lands the whole call in the **Enterprise** SKU —
+**$35.00 per 1,000 requests** — a step below the Enterprise+Atmosphere tier
+that `rating`/`reviews` would trigger. `find-businesses.mjs` deliberately
+never requests `rating` for this reason; ratings are a paid-listings-only
+concern handled later by `import-reviews.mjs` above, not part of sourcing.
+
+It also captures `types` — Google's own category tags (e.g. `plumber`,
+`contractor`) — at no extra cost; that field is already included at the
+Enterprise tier phone/website put us at. These tags aren't stored on the
+`Listing` (they'd be redundant with our own `category`), but they do feed
+into `import-listings.mjs`'s AEO description generation as a real, verified
+signal about what the business does — see
+[ai-descriptions.md](ai-descriptions.md).
+
+One query = one request = up to 20 results. Sourcing the 25-50 businesses
+Layer 0 wants (see [ghl-layer-0.md](ghl-layer-0.md)) typically takes
+10-20 queries — **under $1**, and likely free outright under Google's
+per-SKU monthly allowance (check current limits before assuming that
+holds at larger scale).
+
+```
+npm run find-businesses -- --default        # small starter set, one query per county seat
+npm run find-businesses -- queries.txt       # your own "Category|search text" list, one per line
+```
+
+Writes `out/sourced-businesses.csv` (gitignored), already shaped for
+`scripts/import-listings.mjs` — review it, trim anything wrong, then:
+
+```
+npm run import -- out/sourced-businesses.csv --featured "Name A|Name B|Name C"
+```
 
 ## Google Reviews — $40 per 1,000 requests
 
@@ -70,7 +111,8 @@ npm run reviews -- --dry            # print who'd be fetched, call nothing
 ```
 
 It only fetches listings that are both paid **and** have a `placeId` set (the
-`google_place_id` custom field — admin-filled, see
+`google_place_id` custom field — captured automatically by
+`find-businesses.mjs` at sourcing time, or admin-filled otherwise, see
 [ghl-layer-0.md](ghl-layer-0.md)); anything paid without one is skipped and
 logged rather than matched by name/address guesswork. Results are cached in
 `out/reviews-cache.json` (gitignored) with a `fetchedAt` timestamp — that
