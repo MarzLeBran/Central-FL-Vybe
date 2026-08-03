@@ -1,0 +1,14 @@
+---
+// Phase 0 spike only — throwaway, remove once contextual editing is proven
+// and real Phase 1 content replaces it.
+import { tinaField } from "@tinacms/astro/tina-field";
+
+interface Props {
+  spikeTest: { message?: string | null } | null | undefined;
+}
+const { spikeTest } = Astro.props;
+---
+
+<p data-tina-field={tinaField(spikeTest, "message")} style="font-size: 2rem; padding: 2rem;">
+  {spikeTest?.message ?? "(no message)"}
+</p>

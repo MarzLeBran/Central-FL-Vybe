@@ -6,6 +6,11 @@ out/
 # generated types
 .astro/
 
+# TinaCMS build/codegen output (paused feature — see the plan this was built
+# from; regenerates via `tinacms dev`/`tinacms build`, nothing to preserve)
+tina/__generated__/
+public/admin/
+
 # dependencies
 node_modules/
 
