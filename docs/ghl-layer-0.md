@@ -168,6 +168,12 @@ marked ready for the Layer 3 outreach sequence in one pass.
 
 ## 7. Keeping the live site in sync — Vercel Deploy Hook
 
+**Status: done, live.** The GHL workflow ("Directory Live Sync") and Vercel
+Deploy Hook described below are both set up. Double-check the workflow's
+triggers are filtered to the `business` tag specifically, not left open to
+"any tag" — the AI workflow builder doesn't always scope this correctly on
+the first try.
+
 The site is a **static build** (see repo facts in `CLAUDE.md`) — every listing
 page is prerendered HTML, not a live per-request GHL fetch. That means adding
 `business`, removing it, or editing any "Live now" field in section 2 does
