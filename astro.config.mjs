@@ -3,8 +3,13 @@ import { defineConfig } from 'astro/config';
 
 import tailwindcss from '@tailwindcss/vite';
 import vercel from '@astrojs/vercel';
-import tina from '@tinacms/astro/integration';
-import { tinaAdminDevRedirect } from '@tinacms/astro/vite';
+
+// TinaCMS (tina() integration + tinaAdminDevRedirect vite plugin) is
+// deliberately NOT wired in here — it broke every production build (see the
+// comment in src/pages/tina-island/[name].ts.disabled for the full story:
+// its one on-demand route imported a gitignored, dev-machine-only generated
+// file). Phase 0 is proven and paused, not abandoned — see AGENTS.md's
+// TinaCMS section for how to resume.
 
 // https://astro.build/config
 export default defineConfig({
@@ -12,13 +17,11 @@ export default defineConfig({
   // every page at build time — which is the whole point for listings/SEO/AEO
   // (AGENTS.md). The adapter below only makes `export const prerender = false`
   // work on the specific routes that need it: the claim/add-business forms,
-  // their API endpoints (Layer 2), Stripe checkout (Layer 4), and — new here —
-  // the single `tina-island/[name].ts` route TinaCMS's contextual (click-on-
-  // page) editing needs even on an otherwise fully static site. Everything
-  // else stays static HTML. See docs/tinacms.md.
+  // their API endpoints (Layer 2), Stripe checkout (Layer 4), and the whole
+  // owner/consumer-account surface (/manage, /account). Every listing/
+  // category/county/marketing page stays static HTML.
   adapter: vercel(),
-  integrations: [tina()],
   vite: {
-    plugins: [tailwindcss(), tinaAdminDevRedirect()]
+    plugins: [tailwindcss()]
   }
 });
