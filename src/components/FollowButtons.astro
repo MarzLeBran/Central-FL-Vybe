@@ -1,0 +1,38 @@
+---
+// Wires up every [data-follow-btn] on the page (ListingCard.astro). Mounted
+// once from BaseLayout.astro. If consumer_hint is absent, this does
+// nothing at all — no fetch, no listeners — zero cost for anonymous
+// visitors, who only ever see the inert default heart each card renders.
+---
+
+<script>
+  if (document.cookie.includes("consumer_hint=1")) {
+    fetch("/api/account/favorites.json")
+      .then((r) => (r.ok ? r.json() : { slugs: [] }))
+      .then(({ slugs }: { slugs: string[] }) => {
+        const set = new Set(slugs);
+        document.querySelectorAll<HTMLButtonElement>("[data-follow-btn]").forEach((btn) => {
+          if (set.has(btn.dataset.slug ?? "")) btn.setAttribute("aria-pressed", "true");
+        });
+      })
+      .catch(() => {}); // network blip — hearts just stay unfilled, not fatal
+
+    document.addEventListener("click", async (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-follow-btn]");
+      if (!btn) return;
+      e.preventDefault();
+
+      const pressed = btn.getAttribute("aria-pressed") === "true";
+      btn.setAttribute("aria-pressed", String(!pressed)); // optimistic
+
+      const res = await fetch("/api/account/follow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: btn.dataset.slug, follow: !pressed }),
+      });
+      // Covers a stale hint cookie too: if the real session is gone, the
+      // route 401s and the heart just reverts rather than lying.
+      if (!res.ok) btn.setAttribute("aria-pressed", String(pressed));
+    });
+  }
+</script>

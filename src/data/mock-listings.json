@@ -132,17 +132,30 @@
     "slug": "the-capital-grille",
     "businessName": "The Capital Grille",
     "category": "Restaurants",
-    "description": "The Capital Grille is a restaurant in Orlando, Florida, located in Orange County.",
+    "description": "## Fine Dining in Orlando, FL\n\nThe Capital Grille on International Drive has been a go-to spot for steaks and seafood in Orlando since 2009, known for its dry-aged steaks, extensive wine list, and polished dining room.\n\n## Menu Highlights\n\n- Dry-Aged Steaks\n- Fresh Seafood\n- Award-Winning Wine List\n- Private Dining Rooms\n- Full Bar\n\n**Reservations recommended for dinner service.**\n\n## Why Guests Choose The Capital Grille\n\n- Dry-aged in-house for maximum flavor.\n- Wine list recognized by Wine Spectator.\n- Private rooms available for business dinners and events.\n- Located in the Orlando I-Drive district, easy access from the convention center.\n\nCall ahead for reservations and private dining inquiries.",
     "address": "9101 International Dr Ste 1000, Orlando, FL 32819, USA",
     "county": "Orange",
     "phone": "(407) 370-4392",
     "website": "https://www.thecapitalgrille.com/locations/fl/orlando/orlando-i-drive/8025?cmpid=br:tcg_ag:ie_ch:loc_ca:TCGGMB_sn:gmb_gt:orlando-fl-8025_pl:locurl_rd:1021",
-    "imageUrls": [],
+    "imageUrls": [
+      "https://picsum.photos/seed/the-capital-grille-0/900/600",
+      "https://picsum.photos/seed/the-capital-grille-1/900/600",
+      "https://picsum.photos/seed/the-capital-grille-2/900/600",
+      "https://picsum.photos/seed/the-capital-grille-3/900/600"
+    ],
     "planTier": "premium",
-    "claimStatus": "unclaimed",
+    "claimStatus": "claimed",
     "aiContext": "The Capital Grille. The Capital Grille is a restaurant in Orlando, Florida, located in Orange County.",
     "agencyClient": false,
-    "placeId": "ChIJAaUq3kp-54gRhbms0ogsKzo"
+    "placeId": "ChIJAaUq3kp-54gRhbms0ogsKzo",
+    "email": "owner@example.com",
+    "aiAgentEnabled": true,
+    "socialLinks": {
+      "facebook": "https://facebook.com/example",
+      "instagram": "https://instagram.com/example"
+    },
+    "rating": 4.6,
+    "reviewCount": 1284
   },
   {
     "id": "c_caf-tu-tu-tango",
@@ -474,11 +487,18 @@
     "county": "Osceola",
     "phone": "(407) 847-8433",
     "website": "https://www.allcarshopinc.com/",
-    "imageUrls": [],
+    "imageUrls": [
+      "https://picsum.photos/seed/all-car-shop-0/900/600",
+      "https://picsum.photos/seed/all-car-shop-1/900/600",
+      "https://picsum.photos/seed/all-car-shop-2/900/600",
+      "https://picsum.photos/seed/all-car-shop-3/900/600"
+    ],
     "planTier": "featured",
     "claimStatus": "unclaimed",
     "agencyClient": false,
-    "placeId": "ChIJqzWpm3CE3YgRjbbL5-0GGlA"
+    "placeId": "ChIJqzWpm3CE3YgRjbbL5-0GGlA",
+    "rating": 4.4,
+    "reviewCount": 98
   },
   {
     "id": "c_repairtech-automotive",
@@ -804,11 +824,18 @@
     "county": "Seminole",
     "phone": "(321) 363-3962",
     "website": "https://thehairrefineryfl.com/",
-    "imageUrls": [],
+    "imageUrls": [
+      "https://picsum.photos/seed/the-hair-refinery-fl-0/900/600",
+      "https://picsum.photos/seed/the-hair-refinery-fl-1/900/600",
+      "https://picsum.photos/seed/the-hair-refinery-fl-2/900/600",
+      "https://picsum.photos/seed/the-hair-refinery-fl-3/900/600"
+    ],
     "planTier": "featured",
     "claimStatus": "unclaimed",
     "agencyClient": false,
-    "placeId": "ChIJoQsJpNZt54gRcHawtRVWnU4"
+    "placeId": "ChIJoQsJpNZt54gRcHawtRVWnU4",
+    "rating": 4.9,
+    "reviewCount": 210
   },
   {
     "id": "c_hair-cuttery",
@@ -1106,11 +1133,18 @@
     "county": "Lake",
     "phone": "(352) 329-2078",
     "website": "https://arkplumbingseptic.com/?utm_campaign=gmb",
-    "imageUrls": [],
+    "imageUrls": [
+      "https://picsum.photos/seed/ark-plumbing-service-0/900/600",
+      "https://picsum.photos/seed/ark-plumbing-service-1/900/600",
+      "https://picsum.photos/seed/ark-plumbing-service-2/900/600",
+      "https://picsum.photos/seed/ark-plumbing-service-3/900/600"
+    ],
     "planTier": "featured",
     "claimStatus": "unclaimed",
     "agencyClient": false,
-    "placeId": "ChIJFQR6Robz54gRInWCDXdSPrI"
+    "placeId": "ChIJFQR6Robz54gRInWCDXdSPrI",
+    "rating": 4.7,
+    "reviewCount": 156
   },
   {
     "id": "c_clermont-plumbing-services",
@@ -1450,12 +1484,19 @@
     "county": "Brevard",
     "phone": "(321) 261-0627",
     "website": "https://melbournemistersparky.com/?utm_source=GBP&utm_medium=organic&utm_campaign=melbournegbp",
-    "imageUrls": [],
+    "imageUrls": [
+      "https://picsum.photos/seed/mister-sparky-0/900/600",
+      "https://picsum.photos/seed/mister-sparky-1/900/600",
+      "https://picsum.photos/seed/mister-sparky-2/900/600",
+      "https://picsum.photos/seed/mister-sparky-3/900/600"
+    ],
     "planTier": "premium",
     "claimStatus": "unclaimed",
     "aiContext": "Mister Sparky. Mister Sparky is an electrical contractor serving Melbourne, Florida, in Brevard County. The company provides electrical services for local residents and businesses.",
     "agencyClient": false,
-    "placeId": "ChIJPX1QvGPgGo8R8Y2SToC23I8"
+    "placeId": "ChIJPX1QvGPgGo8R8Y2SToC23I8",
+    "rating": 4.8,
+    "reviewCount": 312
   },
   {
     "id": "c_brevard-electric-services",
@@ -1705,12 +1746,19 @@
     "county": "Volusia",
     "phone": "(386) 231-3415",
     "website": "https://www.adventhealth.com/wellness-centers/adventhealth-wellness-center-daytona-beach",
-    "imageUrls": [],
+    "imageUrls": [
+      "https://picsum.photos/seed/adventhealth-wellness-center-daytona-beach-0/900/600",
+      "https://picsum.photos/seed/adventhealth-wellness-center-daytona-beach-1/900/600",
+      "https://picsum.photos/seed/adventhealth-wellness-center-daytona-beach-2/900/600",
+      "https://picsum.photos/seed/adventhealth-wellness-center-daytona-beach-3/900/600"
+    ],
     "planTier": "premium",
     "claimStatus": "unclaimed",
     "aiContext": "AdventHealth Wellness Center Daytona Beach. AdventHealth Wellness Center Daytona Beach is a health and wellness facility in Daytona Beach, Florida, serving the Volusia County area.",
     "agencyClient": false,
-    "placeId": "ChIJFTmFkEvd5ogRBPWqm-9_Bh0"
+    "placeId": "ChIJFTmFkEvd5ogRBPWqm-9_Bh0",
+    "rating": 4.3,
+    "reviewCount": 87
   },
   {
     "id": "c_advanced-health-wellness",

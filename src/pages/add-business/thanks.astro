@@ -13,10 +13,11 @@ import { site } from "../../config/site";
   <section class="mx-auto max-w-xl px-5 py-20 text-center">
     <p class="meta font-bold text-signal">Submitted</p>
     <h1 class="font-display mt-3 text-head">
-      Thanks<span data-business-suffix></span>
+      Thank you for adding your business to {site.name}
     </h1>
+    <p data-business-name hidden class="meta mt-2 text-ink-soft"></p>
     <p class="mt-4 text-sub text-ink-soft">
-      We'll review your submission and it'll be live on the directory shortly.
+      We'll review your submission and it'll be posted promptly.
       Questions in the meantime? Reach us at{" "}
       <a href={`mailto:${site.contactEmail}`} class="font-bold text-signal">
         {site.contactEmail}
@@ -31,7 +32,10 @@ import { site } from "../../config/site";
 <script>
   const business = new URLSearchParams(location.search).get("business");
   if (business) {
-    const el = document.querySelector("[data-business-suffix]");
-    if (el) el.textContent = ` for ${business}`;
+    const el = document.querySelector<HTMLElement>("[data-business-name]");
+    if (el) {
+      el.textContent = business;
+      el.hidden = false;
+    }
   }
 </script>

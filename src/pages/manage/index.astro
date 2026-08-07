@@ -1,0 +1,61 @@
+---
+// Owner self-serve dashboard — one listing per contact, no multi-listing
+// ownership model (that's a full consumer-accounts concept, out of scope
+// here). Session-gated, re-checks claim/tier eligibility a third time
+// (request-link.ts and verify.ts already checked it) since a session can
+// outlive a downgrade or unclaim within its 7-day life.
+
+export const prerender = false;
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+import { getListingById } from "../../lib/directory";
+import { verifySession, SESSION_COOKIE } from "../../lib/auth";
+import ListingEditForm from "../../components/ListingEditForm.astro";
+
+const session = verifySession(Astro.cookies.get(SESSION_COOKIE)?.value);
+if (!session || session.kind !== "owner") {
+  return Astro.redirect("/manage/login");
+}
+
+const listing = await getListingById(session.contactId);
+const eligible = !!listing && listing.claimStatus === "claimed" && listing.planTier !== "free";
+if (!listing || !eligible) {
+  Astro.cookies.delete(SESSION_COOKIE, { path: "/" });
+  return Astro.redirect("/manage/login?error=ineligible");
+}
+---
+
+<BaseLayout
+  title={`Manage ${listing.businessName} — ${site.name}`}
+  description="Edit your listing's photos, description and links."
+  widget="none"
+>
+  <section class="mx-auto max-w-2xl px-5 py-14">
+    <div class="rule-capped flex items-baseline justify-between pt-5">
+      <div>
+        <p class="meta">Managing</p>
+        <h1 class="font-display text-head">{listing.businessName}</h1>
+      </div>
+      <form method="POST" action="/api/manage/logout">
+        <button type="submit" class="meta font-bold hover:text-signal">Sign out</button>
+      </form>
+    </div>
+
+    <a href={`/business/${listing.slug}`} class="mt-3 inline-block meta text-ink-mute hover:text-signal">
+      View live listing &rarr;
+    </a>
+
+    <div class="mt-8">
+      <ListingEditForm
+        listingId={listing.id}
+        description={listing.description}
+        imageUrls={listing.imageUrls}
+        logoUrl={listing.logoUrl}
+        youtubeUrl={listing.youtubeUrl}
+        bookingUrl={listing.bookingUrl}
+        socialLinks={listing.socialLinks}
+      />
+    </div>
+  </section>
+</BaseLayout>

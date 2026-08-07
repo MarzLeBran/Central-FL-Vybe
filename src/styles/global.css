@@ -177,6 +177,49 @@
     background: var(--h, var(--color-signal));
   }
 
+  /* Rendered listing-description markdown (src/lib/markdown.ts). Every
+     heading level (h1-h6) gets ONE consistent, subordinate style — the page
+     already has its own h1 (business name) and h2 (section label), so owner
+     content using # or ## shouldn't visually compete with or outrank those;
+     normalizing every level the same way sidesteps that without needing to
+     remap heading levels in the renderer itself. list-disc/decimal restore
+     what Tailwind's preflight resets to `list-style: none` by default. */
+  .aeo-content h1,
+  .aeo-content h2,
+  .aeo-content h3,
+  .aeo-content h4,
+  .aeo-content h5,
+  .aeo-content h6 {
+    margin-top: 1.25em;
+    margin-bottom: 0.35em;
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 800;
+    color: var(--color-ink);
+  }
+  .aeo-content > :first-child {
+    margin-top: 0;
+  }
+  .aeo-content p {
+    margin-top: 0.75em;
+  }
+  .aeo-content p:first-child {
+    margin-top: 0;
+  }
+  .aeo-content ul {
+    list-style: disc;
+    padding-left: 1.25em;
+    margin-top: 0.5em;
+  }
+  .aeo-content ol {
+    list-style: decimal;
+    padding-left: 1.25em;
+    margin-top: 0.5em;
+  }
+  .aeo-content li + li {
+    margin-top: 0.25em;
+  }
+
   /* Text sitting directly on a photo. Carries its own contrast so the image
      underneath can stay completely unshaded — no scrim, no opacity layer. */
   .on-photo {
@@ -249,6 +292,50 @@
   }
   [data-theme="dark"] [data-theme-toggle] [data-icon="moon"] {
     display: block;
+  }
+
+  /* Follow-button heart — same two-SVG convention as the theme toggle above. */
+  [data-follow-btn] [data-icon="heart-filled"] {
+    display: none;
+  }
+  [data-follow-btn][aria-pressed="true"] [data-icon="heart-outline"] {
+    display: none;
+  }
+  [data-follow-btn][aria-pressed="true"] [data-icon="heart-filled"] {
+    display: block;
+  }
+
+  /* Header auth state — both Login/Register and Profile/Logout are always in
+     the static HTML; [data-consumer] (set pre-paint, see BaseLayout.astro)
+     picks which one shows. Defaults to the guest state so a no-JS/no-cookie
+     visitor never sees a false logged-in shell. */
+  [data-guest-only] {
+    display: flex;
+  }
+  [data-account-only] {
+    display: none;
+  }
+  [data-consumer="in"] [data-guest-only] {
+    display: none;
+  }
+  [data-consumer="in"] [data-account-only] {
+    display: flex;
+  }
+
+  /* Admin auth state — a separate axis from [data-consumer] (independent
+     identity systems). [data-admin-only] is generic: works in the header
+     AND on any page's content (e.g. business/[slug]'s admin edit link),
+     since [data-admin] lives on <html> and cascades everywhere. Guest-only
+     hides for an admin session too — showing "Login/Register" next to
+     "Signed in as admin" would be nonsense. */
+  [data-admin-only] {
+    display: none;
+  }
+  [data-admin="in"] [data-guest-only] {
+    display: none;
+  }
+  [data-admin="in"] [data-admin-only] {
+    display: inline-flex;
   }
 
   @media (prefers-reduced-motion: reduce) {

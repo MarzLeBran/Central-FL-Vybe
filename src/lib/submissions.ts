@@ -9,14 +9,14 @@
 
 import { mkdirSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { slugify } from "./directory";
+import { slugify, serializeSocialLinks } from "./directory";
 
 const DATA_SOURCE = import.meta.env.DATA_SOURCE ?? "mock";
 const GHL_VERSION = "2021-07-28";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-interface ConsentMeta {
+export interface ConsentMeta {
   tcpaConsent: boolean;
   consentVersion: string;
   ip?: string;
@@ -40,6 +40,7 @@ export interface AddBusinessInput extends ConsentMeta {
   website?: string;
   description?: string;
   ownerName?: string;
+  socialLinks?: Record<string, string>;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<Result
         { key: "listing_slug", fieldValue: slugify(input.businessName) },
         { key: "plan_tier", fieldValue: "Free" },
         { key: "claim_status", fieldValue: "Pending" },
+        { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
         ...consentFields(input, submittedAt),
       ],
     }),
@@ -174,6 +176,50 @@ export async function applyPlanUpgrade(input: {
   return { ok: true };
 }
 
+export interface ListingUpdateInput {
+  listingId: string;
+  description: string;
+  imageUrls: string[]; // full ordered array — index 0 is the cover, see ListingCard.astro
+  logoUrl?: string;
+  youtubeUrl?: string;
+  bookingUrl?: string;
+  socialLinks?: Record<string, string>;
+}
+
+/**
+ * Owner (or admin, on an owner's behalf) self-serve edit of an existing,
+ * already-live listing — src/pages/manage/*. Never touches tags, so the
+ * tag-clobbering hazard the other two write functions guard against doesn't
+ * apply here at all: there is nothing in this body but customFields.
+ */
+export async function submitListingUpdate(input: ListingUpdateInput): Promise<Result> {
+  if (DATA_SOURCE !== "ghl") {
+    logDev("listing-update", input);
+    return { ok: true };
+  }
+
+  const token = requireEnv("GHL_PIT_TOKEN");
+  if (!token) return { ok: false, error: "GHL_PIT_TOKEN is not set" };
+
+  const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
+    method: "PUT",
+    headers: ghlHeaders(token),
+    body: JSON.stringify({
+      customFields: [
+        { key: "business_description", fieldValue: input.description },
+        { key: "image_urls", fieldValue: input.imageUrls.join(",") },
+        { key: "logo_url", fieldValue: input.logoUrl ?? "" },
+        { key: "youtube_url", fieldValue: input.youtubeUrl ?? "" },
+        { key: "booking_url", fieldValue: input.bookingUrl ?? "" },
+        { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
+      ],
+    }),
+  });
+
+  if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
+  return { ok: true };
+}
+
 // ── GHL helpers ──────────────────────────────────────────────────────────────
 
 function ghlHeaders(token: string) {
@@ -184,7 +230,9 @@ function ghlHeaders(token: string) {
   };
 }
 
-function consentFields(input: ConsentMeta, submittedAt: string) {
+// Exported for reuse by src/lib/consumer-submissions.ts — identical consent
+// mechanism, no reason to drift into a second implementation.
+export function consentFields(input: ConsentMeta, submittedAt: string) {
   return [
     { key: "tcpa_consent", fieldValue: input.tcpaConsent ? "true" : "false" },
     { key: "tcpa_consent_ts", fieldValue: submittedAt },

@@ -123,7 +123,7 @@ const channels = site.channels.filter((c) => c.url);
         </p>
         <div class="mt-4 flex flex-wrap gap-2">
           {channels.map((c) => (
-            <a href={c.url} rel="noopener" class="chip hue-block">
+            <a href={c.url} target="_blank" rel="noopener" class="chip hue-block">
               {c.name} &middot; {c.handle}
             </a>
           ))}

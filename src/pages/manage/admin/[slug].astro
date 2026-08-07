@@ -1,0 +1,56 @@
+---
+// Admin edit any listing — no claim/tier gate (you can seed photos on an
+// unclaimed or free listing too). Same ListingEditForm as the owner
+// dashboard; api/manage/update.ts and upload.ts trust an admin session's
+// explicit listingId rather than binding to a single contact.
+
+export const prerender = false;
+
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { site } from "../../../config/site";
+import { getListingBySlug } from "../../../lib/directory";
+import { verifySession, SESSION_COOKIE } from "../../../lib/auth";
+import ListingEditForm from "../../../components/ListingEditForm.astro";
+
+const session = verifySession(Astro.cookies.get(SESSION_COOKIE)?.value);
+if (!session || session.kind !== "admin") {
+  return Astro.redirect("/manage/admin/login");
+}
+
+const listing = await getListingBySlug(Astro.params.slug);
+if (!listing) {
+  return Astro.redirect("/manage/admin");
+}
+---
+
+<BaseLayout
+  title={`Admin: ${listing.businessName} — ${site.name}`}
+  description="Edit this listing's photos, description and links."
+  widget="none"
+>
+  <section class="mx-auto max-w-2xl px-5 py-14">
+    <div class="rule-capped flex items-baseline justify-between pt-5">
+      <div>
+        <p class="meta">Editing (admin)</p>
+        <h1 class="font-display text-head">{listing.businessName}</h1>
+      </div>
+      <a href="/manage/admin" class="meta font-bold hover:text-signal">&larr; All listings</a>
+    </div>
+
+    <a href={`/business/${listing.slug}`} class="mt-3 inline-block meta text-ink-mute hover:text-signal">
+      View live listing &rarr;
+    </a>
+
+    <div class="mt-8">
+      <ListingEditForm
+        listingId={listing.id}
+        description={listing.description}
+        imageUrls={listing.imageUrls}
+        logoUrl={listing.logoUrl}
+        youtubeUrl={listing.youtubeUrl}
+        bookingUrl={listing.bookingUrl}
+        socialLinks={listing.socialLinks}
+      />
+    </div>
+  </section>
+</BaseLayout>

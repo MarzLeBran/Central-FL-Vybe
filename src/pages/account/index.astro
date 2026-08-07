@@ -1,0 +1,117 @@
+---
+// Consumer profile — avatar upload, name, followed listings, sign out.
+// Session-gated (consumer kind only); a stale/expired session bounces to
+// /account/login rather than showing a partial page.
+
+export const prerender = false;
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+import { getConsumerById } from "../../lib/consumers";
+import { getListingBySlug } from "../../lib/directory";
+import { verifySession, SESSION_COOKIE } from "../../lib/auth";
+import ListingCard from "../../components/ListingCard.astro";
+
+const session = verifySession(Astro.cookies.get(SESSION_COOKIE)?.value);
+if (!session || session.kind !== "consumer") {
+  return Astro.redirect("/account/login");
+}
+
+const consumer = await getConsumerById(session.contactId);
+if (!consumer) {
+  Astro.cookies.delete(SESSION_COOKIE, { path: "/" });
+  return Astro.redirect("/account/login");
+}
+
+// A followed slug may no longer resolve (listing removed) — drop it
+// silently rather than showing a broken card.
+const followed = (
+  await Promise.all(consumer.followedSlugs.map((slug) => getListingBySlug(slug)))
+).filter((l) => l !== null);
+---
+
+<BaseLayout
+  title={`Your account — ${site.name}`}
+  description="Manage your profile and followed businesses."
+  widget="none"
+>
+  <section class="mx-auto max-w-4xl px-5 py-14">
+    <div class="rule-capped flex items-baseline justify-between pt-5">
+      <h1 class="font-display text-head">
+        {consumer.firstName} {consumer.lastName}
+      </h1>
+      <form method="POST" action="/api/manage/logout">
+        <button type="submit" class="meta font-bold hover:text-signal">Sign out</button>
+      </form>
+    </div>
+
+    <div class="mt-8 flex items-center gap-4" data-avatar-widget data-contact-id={consumer.id}>
+      <img
+        data-avatar-preview
+        src={consumer.avatarUrl || undefined}
+        class:list={["h-16 w-16 border-2 border-rule bg-paper object-cover", !consumer.avatarUrl && "hidden"]}
+        alt=""
+      />
+      <div>
+        <p class="meta mb-1.5">Profile photo</p>
+        <input type="file" accept="image/*" data-avatar-input class="text-sm" />
+        <p data-avatar-status class="mt-1 hidden text-xs text-ink-soft"></p>
+      </div>
+    </div>
+
+    <div class="mt-10 border-t-2 border-rule pt-6">
+      <h2 class="meta mb-4">
+        {followed.length ? `Following (${followed.length})` : "Following"}
+      </h2>
+      {
+        followed.length > 0 ? (
+          <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {followed.map((listing, i) => <ListingCard listing={listing!} index={i} />)}
+          </div>
+        ) : (
+          <p class="text-sm text-ink-soft">
+            You're not following any businesses yet. Tap the heart on a listing to follow it.
+          </p>
+        )
+      }
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-avatar-widget]").forEach((root) => {
+    const contactId = root.dataset.contactId!;
+    const input = root.querySelector<HTMLInputElement>("[data-avatar-input]")!;
+    const preview = root.querySelector<HTMLImageElement>("[data-avatar-preview]")!;
+    const status = root.querySelector<HTMLElement>("[data-avatar-status]")!;
+
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      status.textContent = "Uploading…";
+      status.classList.remove("hidden");
+      try {
+        const { upload } = await import("@vercel/blob/client");
+        const pathname = `consumers/${contactId}/avatar-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9.\-]/g, "_")}`;
+        const blob = await upload(pathname, file, {
+          access: "public",
+          handleUploadUrl: "/api/account/avatar-upload",
+        });
+        const res = await fetch("/api/account/avatar-update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ avatarUrl: blob.url }),
+        });
+        const result = await res.json();
+        if (!res.ok || !result.ok) throw new Error(result.error ?? "save failed");
+        preview.src = blob.url;
+        preview.classList.remove("hidden");
+        status.classList.add("hidden");
+      } catch (err) {
+        status.textContent = `Upload failed: ${(err as Error).message}`;
+      } finally {
+        input.value = "";
+      }
+    });
+  });
+</script>

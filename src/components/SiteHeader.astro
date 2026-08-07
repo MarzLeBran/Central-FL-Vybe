@@ -63,7 +63,9 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
       }
     </a>
 
+
     <nav aria-label="Categories" class="hidden items-center gap-1 md:flex" data-navgroups>
+      <a href="/" class="meta px-2 py-2 font-bold hover:text-signal">Home</a>
       {
         groups.map((group) => (
           <details class="group relative" data-navgroup>
@@ -134,6 +136,7 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
       }
 
       <a href="/listings" class="meta px-2 py-2 font-bold hover:text-signal">All listings</a>
+      <a href="/about" class="meta px-2 py-2 font-bold hover:text-signal">About</a>
     </nav>
 
     <details class="relative md:hidden" data-navgroup>
@@ -141,6 +144,7 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
         Categories <span aria-hidden="true" class="text-[0.6em]">&#9660;</span>
       </summary>
       <div class="absolute left-0 top-full z-50 max-h-[70vh] min-w-64 overflow-y-auto border-2 border-ink bg-paper py-1 shadow-xl">
+        <a href="/" class="meta block px-4 py-2 font-bold">Home</a>
         {
           groups.map((group) => (
             <div class="border-b border-rule py-1 last:border-0">
@@ -178,6 +182,23 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
           </a>
         ))}
         <a href="/listings" class="meta block px-4 py-2 font-bold">All listings</a>
+        <a href="/about" class="meta block px-4 py-2 font-bold">About</a>
+        <div data-guest-only class="flex-col border-t border-rule">
+          <a href="/account/login" class="meta block px-4 py-2 font-bold">Login</a>
+          <a href="/account/register" class="meta block px-4 py-2 font-bold">Register</a>
+        </div>
+        <div data-account-only class="flex-col border-t border-rule">
+          <a href="/account" class="meta block px-4 py-2 font-bold">Profile</a>
+          <form method="POST" action="/api/manage/logout">
+            <button type="submit" class="meta block w-full px-4 py-2 text-left font-bold">Logout</button>
+          </form>
+        </div>
+        <div data-admin-only class="flex-col border-t border-rule">
+          <a href="/manage/admin" class="meta block px-4 py-2 font-bold">Admin</a>
+          <form method="POST" action="/api/manage/logout">
+            <button type="submit" class="meta block w-full px-4 py-2 text-left font-bold">Sign out</button>
+          </form>
+        </div>
       </div>
     </details>
 
@@ -189,6 +210,37 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
           </div>
         )
       }
+      <a
+        href="/add-business"
+        class="shrink-0 whitespace-nowrap border-2 border-ink bg-ink px-3 py-2 text-xs font-bold text-paper hover:border-signal hover:bg-signal sm:px-4 sm:text-sm"
+      >
+        Add your business
+      </a>
+
+      {/* All three blocks always render — [data-consumer]/[data-admin] (set
+          pre-paint in BaseLayout.astro) pick which one shows, defaulting to
+          guest so a no-JS visitor never sees a false logged-in shell. Admin
+          and consumer are separate identity systems, so at most one of
+          data-account-only/data-admin-only is ever shown alongside
+          data-guest-only being hidden — never both at once in practice,
+          since logging into one overwrites the other's session cookie. */}
+      <div data-guest-only class="shrink-0 items-center gap-1">
+        <a href="/account/login" class="meta px-2 py-2 font-bold hover:text-signal">Login</a>
+        <a href="/account/register" class="meta px-2 py-2 font-bold hover:text-signal">Register</a>
+      </div>
+      <div data-account-only class="shrink-0 items-center gap-1">
+        <a href="/account" class="meta px-2 py-2 font-bold hover:text-signal">Profile</a>
+        <form method="POST" action="/api/manage/logout">
+          <button type="submit" class="meta px-2 py-2 font-bold hover:text-signal">Logout</button>
+        </form>
+      </div>
+      <div data-admin-only class="shrink-0 items-center gap-1">
+        <a href="/manage/admin" class="meta px-2 py-2 font-bold hover:text-signal">Admin</a>
+        <form method="POST" action="/api/manage/logout">
+          <button type="submit" class="meta px-2 py-2 font-bold hover:text-signal">Sign out</button>
+        </form>
+      </div>
+
       <button
         type="button"
         data-theme-toggle
@@ -203,13 +255,6 @@ const counties = site.counties.filter((c) => byCounty[c.name]?.length);
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
         </svg>
       </button>
-
-      <a
-        href="/add-business"
-        class="shrink-0 whitespace-nowrap border-2 border-ink bg-ink px-3 py-2 text-xs font-bold text-paper hover:border-signal hover:bg-signal sm:px-4 sm:text-sm"
-      >
-        Add your business
-      </a>
     </div>
   </div>
 </header>

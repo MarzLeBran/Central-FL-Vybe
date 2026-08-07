@@ -17,9 +17,13 @@ export function isPaidTier(tier: PlanTier): boolean {
   return tier !== "free";
 }
 
-/** Only the top tier gets its own AI agent — see the widget rule in AGENTS.md. */
-export function hasListingAgent(tier: PlanTier): boolean {
-  return tier === "premium";
+/** Premium is necessary but not sufficient — a real agent still has to be
+ *  built and enabled per business (`aiAgentEnabled`, manually flipped on once
+ *  Layer 5 work is actually done for that listing). Being on the top tier
+ *  alone must never show an "Ask the business" card with nothing behind it —
+ *  see the widget rule in AGENTS.md. */
+export function hasListingAgent(listing: Pick<Listing, "planTier" | "aiAgentEnabled">): boolean {
+  return listing.planTier === "premium" && !!listing.aiAgentEnabled;
 }
 
 /** Sort order for grids: highest plan first. Placement is what a plan buys. */
@@ -46,12 +50,21 @@ export interface Listing {
   imageUrls: string[];        // image_urls (parsed)
   hours?: string;             // hours
   socialLinks?: Record<string, string>; // social_links (parsed)
+  logoUrl?: string;           // logo_url — owner-uploaded, separate from imageUrls[0]/cover
+  youtubeUrl?: string;        // youtube_url — curated safe embed, validated at write time
+  bookingUrl?: string;        // booking_url — curated safe embed (e.g. Calendly), validated at write time
 
   planTier: PlanTier;         // plan_tier  -> drives Featured styling + which chat widget
   claimStatus: ClaimStatus;   // claim_status
+  email?: string;             // GHL's native contact email — set at claim time; used to
+                              // look up a listing for owner self-serve login (src/lib/auth.ts)
 
-  // Per-listing AI agent (Featured only)
+  // Per-listing AI agent (Premium only, and only once actually built)
   aiContext?: string;         // ai_context — the knowledge blurb the business agent uses
+  aiAgentEnabled?: boolean;   // ai_agent_enabled — manually flipped on once a real agent has
+                              // been built for this specific business (see hasListingAgent()).
+                              // Premium alone does NOT imply this — most premium listings
+                              // won't have it yet.
 
   // Agency-client lead routing (see Layer 5 in the build doc)
   agencyClient: boolean;      // agency_client — true once they buy monthly agency services

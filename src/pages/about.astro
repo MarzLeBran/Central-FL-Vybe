@@ -1,0 +1,360 @@
+---
+// src/pages/about.astro
+//
+// Non-listing page — inherits the default "directory" widget from
+// BaseLayout per the widget-routing rule. No `widget` prop needed here.
+//
+// Color tokens: paper/ink/ink-soft/rule/signal/signal-sunk are real @theme
+// tokens in global.css and are used below (bg-paper, text-ink, text-ink-soft,
+// border-rule, bg-signal, hover:bg-signal-sunk). Amber (#efb02a) and teal
+// (#33a399) are NOT standalone tokens — they only exist baked into the
+// category-hue system (.hue-sun / .hue-lagoon in global.css), which is a
+// different subsystem (per-category color assignment). Using them here as
+// isolated accent text/washes has no direct token equivalent, so those
+// instances are left as literal hex — see inline notes at each one.
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const differentiators = [
+  {
+    title: 'We build visibility, not just listings',
+    body: "A listing that nobody finds doesn't do a business any good. Every page here is built to show up in local search, because that's the whole point.",
+  },
+  {
+    title: 'We create real opportunities',
+    body: 'Every claimed listing, every review, every AI conversation on this site is a chance for a local business to turn a search into a customer.',
+  },
+  {
+    title: 'We connect businesses with local customers',
+    body: 'People searching for a plumber, a salon, or a restaurant in their own county should find the businesses actually serving that county — not a national chain with a bigger ad budget.',
+  },
+  {
+    title: 'We keep improving the platform',
+    body: "This directory isn't a project we finished and walked away from. We add tools, fix what's clunky, and build the things local businesses actually ask for.",
+  },
+  {
+    title: 'We help businesses look their best',
+    body: 'A clean, professional listing page changes how a customer feels about a business before they ever pick up the phone. That first impression matters, so we take it seriously.',
+  },
+];
+
+const commitments = [
+  'We will never bury a free listing to force an upgrade. A free page here is a real, complete page.',
+  "We will tell you honestly whether a paid tier is worth it for your business — even when the honest answer is 'not yet.'",
+  "We earn the right to sell you something by being useful first. If we haven't been useful yet, we haven't earned that conversation.",
+  'Your information stays accurate and yours to correct. Claiming a listing means control, not a sales funnel you can\u2019t opt out of.',
+];
+---
+
+<BaseLayout
+  title="About VYBE Directories | Florida Business Directory"
+  description="VYBE Directories is a Florida-first local business directory built to help local businesses get found, get trusted, and grow. Learn what makes VYBE different."
+>
+  <main>
+    <!-- ============ HERO ============ -->
+    <section class="relative overflow-hidden bg-paper">
+      <div class="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 py-20 sm:py-28 lg:grid-cols-12 lg:gap-8 lg:px-8">
+        <div class="lg:col-span-7">
+          <p class="meta text-signal">
+            About VYBE Directories
+          </p>
+          <h1 class="font-display mt-5 text-mast">
+            A Florida business directory built for the businesses in it.
+          </h1>
+          <p class="mt-6 max-w-xl text-sub text-ink-soft">
+            VYBE Directories helps local businesses across Florida get found,
+            get trusted, and get more customers. Not with gimmicks — with a
+            directory that actually works, built by people who live here too.
+          </p>
+          <div class="mt-9 flex flex-wrap items-center gap-4">
+            <a
+              href="/add-business"
+              class="bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk"
+            >
+              Add your business
+            </a>
+            <a
+              href="/listings"
+              class="border-2 border-ink px-5 py-3.5 text-sm font-bold hover:border-signal hover:text-signal"
+            >
+              Browse the directory
+            </a>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5" aria-hidden="true">
+          <svg viewBox="0 0 480 380" class="mx-auto w-full max-w-md" role="img" aria-label="">
+            <circle cx="240" cy="150" r="88" fill="#efb02a" opacity="0.9"></circle>
+            <g fill="#17414b">
+              <rect x="40" y="230" width="46" height="130" rx="2"></rect>
+              <rect x="96" y="190" width="38" height="170" rx="2"></rect>
+              <rect x="144" y="245" width="30" height="115" rx="2"></rect>
+              <rect x="310" y="210" width="42" height="150" rx="2"></rect>
+              <rect x="362" y="255" width="34" height="105" rx="2"></rect>
+              <rect x="404" y="225" width="40" height="135" rx="2"></rect>
+            </g>
+            <path
+              d="M60 360 C 60 300, 70 260, 70 230 M70 230 C 78 236, 82 246, 80 260"
+              stroke="#33a399"
+              stroke-width="8"
+              fill="none"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M70 232 C 40 224, 24 234, 14 252 M70 232 C 44 214, 42 196, 50 178 M70 232 C 92 218, 108 220, 122 236"
+              stroke="#33a399"
+              stroke-width="7"
+              fill="none"
+              stroke-linecap="round"
+            ></path>
+            <rect x="0" y="358" width="480" height="4" fill="#17414b" opacity="0.12"></rect>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ INTRO ============ -->
+    <section class="bg-paper pb-16 sm:pb-20">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="text-xl leading-relaxed text-ink-soft sm:text-2xl">
+          This isn't just another business directory. It's a Florida-first
+          platform built around one job: help the local business down the
+          street get found by the customer who's already looking for them.
+          The directory is where that starts — it isn't where it ends.
+        </p>
+      </div>
+    </section>
+
+    <div class="mx-auto max-w-7xl px-6 lg:px-8" aria-hidden="true">
+      <svg viewBox="0 0 1200 40" class="w-full text-rule" preserveAspectRatio="none">
+        <polyline
+          points="0,32 60,32 60,14 100,14 100,26 150,26 150,6 190,6 190,30 260,30 260,18 300,18 300,32 380,32 380,10 420,10 420,24 480,24 480,32 1200,32"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        ></polyline>
+      </svg>
+    </div>
+
+    <!-- ============ WHY VYBE EXISTS ============ -->
+    <!-- Eyebrow left as literal teal hex — #33a399 has no standalone token,
+         only .hue-lagoon (a full section-background component), see the
+         header note above. -->
+    <section class="bg-paper py-16 sm:py-24">
+      <div class="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-6 lg:grid-cols-12 lg:gap-16 lg:px-8">
+        <div class="lg:col-span-4">
+          <h2 class="meta text-[#33a399]">
+            Why VYBE exists
+          </h2>
+        </div>
+        <div class="lg:col-span-8">
+          <p class="font-display text-2xl font-medium leading-snug text-ink sm:text-3xl">
+            Local business owners already work incredibly hard. Finding
+            customers shouldn't be the hardest part of the job.
+          </p>
+          <p class="mt-6 text-lg leading-relaxed text-ink-soft">
+            Most local business directories are built to sell ads, not to
+            help anyone actually get found. Listings are thin, out of date,
+            and buried under whoever paid the most that month. We built VYBE
+            because Florida's local business community deserved something
+            better than that — a directory that treats a real listing like a
+            real asset, not a lead magnet for someone else's product.
+          </p>
+          <p class="mt-4 text-lg leading-relaxed text-ink-soft">
+            So we built a Florida business directory that starts with the
+            listing itself: accurate, complete, and free to claim. Everything
+            else we do — the tools, the AI, the marketing services — comes
+            after that, not instead of it.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ OUR PHILOSOPHY ============ -->
+    <!-- bg wash + eyebrow left as literal teal hex — no standalone token,
+         see header note. border-rule replaces the ink/10 hairline. -->
+    <section class="border-y border-rule bg-[#33a399]/[0.06] py-16 sm:py-24">
+      <div class="mx-auto max-w-4xl px-6 text-center lg:px-8">
+        <h2 class="meta text-[#33a399]">
+          Our philosophy
+        </h2>
+        <p class="font-display mt-5 text-2xl font-medium leading-snug text-ink sm:text-3xl">
+          If local businesses succeed, local communities get stronger. It's
+          that simple.
+        </p>
+        <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft">
+          We're not here to sell gimmicks or chase a trend. We're here to
+          remove the obstacles that keep good businesses from growing —
+          starting with the most basic one: making sure people can find you
+          at all. We believe trust is earned through results, not through a
+          sales pitch, which is why we lead with a directory that's genuinely
+          useful before we ever ask a business owner for a dollar.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ WHAT MAKES VYBE DIFFERENT ============ -->
+    <!-- Cards now match the site's flat-card convention (ListingCard.astro,
+         pricing.astro's tier cards): border-2 border-rule bg-paper, square
+         corners, no drop shadow — rounded-2xl/shadow-sm/bg-white don't
+         appear anywhere else in this codebase. -->
+    <section class="bg-paper py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="max-w-2xl">
+          <h2 class="meta text-[#33a399]">
+            What makes VYBE different
+          </h2>
+          <p class="font-display mt-4 text-2xl font-medium leading-snug text-ink sm:text-3xl">
+            We don't simply create listings.
+          </p>
+        </div>
+
+        <div class="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-6">
+          <div class="border-2 border-rule bg-paper p-8 lg:col-span-3">
+            <h3 class="font-display text-lg font-semibold text-ink">{differentiators[0].title}</h3>
+            <p class="mt-3 text-base leading-relaxed text-ink-soft">{differentiators[0].body}</p>
+          </div>
+          <div class="border-2 border-rule bg-paper p-8 lg:col-span-3">
+            <h3 class="font-display text-lg font-semibold text-ink">{differentiators[1].title}</h3>
+            <p class="mt-3 text-base leading-relaxed text-ink-soft">{differentiators[1].body}</p>
+          </div>
+          <div class="border-2 border-rule bg-paper p-8 lg:col-span-2">
+            <h3 class="font-display text-lg font-semibold text-ink">{differentiators[2].title}</h3>
+            <p class="mt-3 text-base leading-relaxed text-ink-soft">{differentiators[2].body}</p>
+          </div>
+          <div class="border-2 border-rule bg-paper p-8 lg:col-span-2">
+            <h3 class="font-display text-lg font-semibold text-ink">{differentiators[3].title}</h3>
+            <p class="mt-3 text-base leading-relaxed text-ink-soft">{differentiators[3].body}</p>
+          </div>
+          <div class="border-2 border-rule bg-paper p-8 lg:col-span-2">
+            <h3 class="font-display text-lg font-semibold text-ink">{differentiators[4].title}</h3>
+            <p class="mt-3 text-base leading-relaxed text-ink-soft">{differentiators[4].body}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ OUR COMMITMENT TO LOCAL BUSINESSES ============ -->
+    <!-- hue-deep + hue-block = fixed navy bg / cream text, exactly matching
+         the original bg-[#17414b] + text-white intent — and unlike bg-ink/
+         text-ink (which FLIP in dark mode, since ink is the page's inverting
+         surface token, not a fixed brand color), hue-block's --h/--h-ink are
+         deliberately theme-stable (see the comment above .hue-coral in
+         global.css), so this band stays a dark accent band in both themes
+         instead of turning into a near-invisible light-on-light block when
+         the site is in dark mode. Text color is inherited from hue-block;
+         only opacity is applied to the list items now. Amber eyebrow left
+         as literal hex — no token, and hue-fg would resolve to this same
+         navy here (invisible against its own background). Square corners
+         on the bullet dot to match the rest of the site (no rounded-full
+         elsewhere in this codebase outside unfinished chat-widget
+         placeholders). -->
+    <section class="hue-deep hue-block py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="max-w-2xl">
+          <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-[#efb02a]">
+            Our commitment to local businesses
+          </h2>
+          <p class="font-display mt-4 text-2xl font-medium leading-snug sm:text-3xl">
+            A few things we hold ourselves to, in writing.
+          </p>
+        </div>
+        <ul class="mt-12 grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
+          {commitments.map((item) => (
+            <li class="flex gap-4">
+              <span class="mt-1.5 h-2 w-2 flex-none bg-signal"></span>
+              <span class="text-lg leading-relaxed opacity-85">{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ WHY FLORIDA ============ -->
+    <section class="bg-paper py-16 sm:py-24">
+      <div class="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-6 lg:grid-cols-12 lg:gap-16 lg:px-8">
+        <div class="lg:col-span-4">
+          <h2 class="meta text-[#33a399]">
+            Why Florida
+          </h2>
+        </div>
+        <div class="lg:col-span-8">
+          <p class="font-display text-2xl font-medium leading-snug text-ink sm:text-3xl">
+            We're Florida-first because Florida is where we live and work.
+          </p>
+          <p class="mt-6 text-lg leading-relaxed text-ink-soft">
+            Florida's local business community is enormous and growing fast
+            — new residents, new neighborhoods, new demand for the plumbers,
+            salons, restaurants, and contractors who make a community
+            actually run. That growth is an opportunity for local businesses
+            to be found by people who don't know them yet, but only if those
+            businesses show up where people are searching.
+          </p>
+          <p class="mt-4 text-lg leading-relaxed text-ink-soft">
+            That's the gap VYBE fills, one county and one region at a time.
+            Central Florida VYBE and South Florida VYBE aren't separate
+            products bolted together — they're the same directory, the same
+            standards, and the same commitment, built out region by region
+            so every part of Florida gets a directory that actually
+            represents its own local business community.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LOOKING AHEAD ============ -->
+    <!-- Amber wash bg + teal eyebrow left as literal hex — no standalone
+         tokens for either, see header note. border-rule replaces ink/10. -->
+    <section class="border-y border-rule bg-[#efb02a]/[0.08] py-16 sm:py-24">
+      <div class="mx-auto max-w-4xl px-6 lg:px-8">
+        <h2 class="meta text-[#33a399]">
+          Looking ahead
+        </h2>
+        <p class="font-display mt-4 text-2xl font-medium leading-snug text-ink sm:text-3xl">
+          The directory is where VYBE starts. It isn't where VYBE stops.
+        </p>
+        <p class="mt-6 text-lg leading-relaxed text-ink-soft">
+          Over time, we're building out what a growing business actually
+          needs after the listing: modern websites, reputation management,
+          local SEO, automation, and AI tools that help a business answer
+          customers faster. None of that is the point of this page, and
+          none of it is required to be part of the VYBE community — a free
+          listing is a complete, useful thing on its own.
+        </p>
+        <p class="mt-4 text-lg leading-relaxed text-ink-soft">
+          When a business is ready for more, we'll be here. When they're
+          not, we'd still rather be useful to them for free than pushy
+          about it.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ CLOSING CTA ============ -->
+    <section class="bg-paper py-20 sm:py-28">
+      <div class="mx-auto max-w-3xl px-6 text-center lg:px-8">
+        <h2 class="font-display text-3xl font-bold leading-tight text-ink sm:text-4xl">
+          Join the local business community on VYBE.
+        </h2>
+        <p class="mt-5 text-lg leading-relaxed text-ink-soft">
+          Find your business, claim it, and make sure your information is
+          right. It takes a few minutes and it's free — that's the whole
+          point.
+        </p>
+        <div class="mt-9 flex flex-wrap items-center justify-center gap-4">
+          <a
+            href="/listings"
+            class="bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk"
+          >
+            Find and claim your listing
+          </a>
+          <a
+            href="/add-business"
+            class="border-2 border-ink px-5 py-3.5 text-sm font-bold hover:border-signal hover:text-signal"
+          >
+            Don't see your business? Add it
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>

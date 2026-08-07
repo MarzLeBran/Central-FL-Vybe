@@ -1,11 +1,47 @@
-# Consumer accounts — spec (not yet built)
+# Consumer accounts
 
-Captured from the reference directory. **Committed to the roadmap, deliberately
-not built yet** — see "Why it isn't next" at the bottom.
+Captured from the reference directory, then built out for real (see "Status:
+built" below). Lets any visitor register, sign in, follow businesses, and
+manage a small profile — separate from the business-owner side (`/manage`).
 
-Lets any visitor register, sign in, and manage a profile: claim a business,
-follow businesses, track listing requests. It is the hub the claim flow (L2) and
-the deferred content types (L6) both hang off.
+## Status: built
+
+Register/login (magic-link, no password), follow/unfollow a listing (heart
+button on `ListingCard.astro` and the detail page), a profile page
+(`/account` — avatar upload, list of followed listings, sign out), and a
+share button (no login required) are all live. Files: `src/lib/consumers.ts`
+(read), `src/lib/consumer-submissions.ts` (write), `src/pages/account/*`,
+`src/pages/api/account/*`, `src/components/FollowButtons.astro`. A consumer
+is a GHL contact tagged `consumer` — see `docs/ghl-layer-0.md`'s tags table —
+deliberately never linked to a claimed listing's contact even when the same
+email is used for both (see "Deliberately not built" below).
+
+**Not built**, from the original reference-inspired spec further down this
+doc: the richer profile tabs (Owned Business, Listing Requests, Applied Jobs,
+Events Activity — all depend on features that don't exist yet either, per
+the doc's own note under "4. Profile"). What shipped is "About" (name/avatar)
++ "Following" only.
+
+## Narrower slice built first: owner self-serve listing editing
+
+`/manage/*` (`src/lib/auth.ts`) is the separate "a claimed, paid-tier owner
+edits their own listing" system — magic-link, no password, no users table,
+the GHL contact is the source of truth, sessions are signed cookies. It
+predates and remains fully independent of the consumer-accounts system above
+— see "Deliberately not built" for why they're not linked.
+
+Magic-link delivery uses GHL's own Conversations API
+(`POST /conversations/messages`, reusing `GHL_PIT_TOKEN` — no new vendor) in
+`sendMagicLinkEmail()` (`src/lib/auth.ts`). **The exact request body shape was
+unverified at build time — smoke-test against a live sandbox contact before
+trusting this with real owners.** If it doesn't pan out, swap in Resend
+(`RESEND_API_KEY`, documented in `.env.example`) as a raw-fetch call, same
+convention already used for GHL/Stripe elsewhere in this repo.
+
+An internal admin editor also exists at `/manage/admin`, behind a separate
+shared `ADMIN_PASSWORD` — lets you edit any listing (claimed or not, any tier)
+on a client's behalf, reusing the same edit UI (`ListingEditForm.astro`) and
+write path.
 
 ## Screens
 
@@ -91,10 +127,21 @@ Two things make this bigger than it looks:
 Reference terminology worth keeping: a person is a **consumer contact**; linking
 one to a listing is what a claim does. An admin can also link them manually.
 
-## Why it isn't next
+## Why it wasn't next (historical — built anyway, per the owner's request)
 
-The funnel does not need it. Businesses get claimed via a tokenised link from the
-outreach email (L2) — no account required. Consumer accounts add reach and
-stickiness, which matter once there is traffic to be sticky about.
+The funnel doesn't strictly need it: businesses get claimed via a tokenised
+link from the outreach email (L2), no account required. Consumer accounts
+were originally planned as an "after L3 outreach" layer, added for reach and
+stickiness once there was traffic to be sticky about. The owner asked for it
+ahead of that sequence — see "Status: built" above.
 
-Order stays: **L1 front door → L2 claim + add-business → L3 outreach → then this.**
+## Deliberately not built: linking a consumer account to a claimed listing
+
+A consumer contact (`consumer` tag) and a listing's contact (`business` tag)
+are completely separate identities, even if the same person registers with
+the same email they later use to claim a business via `/claim`. `/claim` has
+zero session/auth awareness — it's still the same anonymous public form it
+always was. If that integration is ever wanted (e.g. "claiming from inside a
+logged-in session auto-fills the claim form," or "an owner's `/manage` and
+`/account` merge into one identity"), it needs its own design pass — don't
+assume it falls out of what's here for free.

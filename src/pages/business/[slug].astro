@@ -20,6 +20,8 @@ import { isPaidTier, hasListingAgent } from "../../types/listing";
 import { getListings, getListingBySlug } from "../../lib/directory";
 import DirectoryWidget from "../../components/DirectoryWidget.astro";
 import ListingAgentWidget from "../../components/ListingAgentWidget.astro";
+import SocialIcon from "../../components/SocialIcon.astro";
+import { renderDescriptionHtml, plainTextDescription } from "../../lib/markdown";
 
 export async function getStaticPaths() {
   const listings = await getListings();
@@ -39,7 +41,7 @@ if (!listing) return Astro.redirect("/404");
 // on /pricing, so the mid tier does NOT get its own agent. hasListingAgent() is
 // the single place that decides this.
 const isPaid = isPaidTier(listing.planTier);
-const showsAgent = hasListingAgent(listing.planTier);
+const showsAgent = hasListingAgent(listing);
 const plan = site.plans.find((p) => p.id === listing.planTier);
 const hue = await hueClass(listing.category);
 
@@ -55,12 +57,18 @@ const socials = Object.entries(listing.socialLinks ?? {});
 const [cover, ...gallery] = listing.imageUrls ?? [];
 const mapQuery = encodeURIComponent(`${listing.businessName}, ${listing.address}`);
 
+// listing.description is markdown SOURCE — rendered safely (no links, no raw
+// HTML, see src/lib/markdown.ts) for the visible page body; plain text for
+// anywhere markup can't go (meta tags, JSON-LD).
+const descriptionHtml = renderDescriptionHtml(listing.description);
+const descriptionText = plainTextDescription(listing.description);
+
 const jsonLd: Record<string, unknown> = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   "@id": `${site.origin}/business/${listing.slug}#localbusiness`,
   name: listing.businessName,
-  description: listing.description,
+  description: descriptionText,
   url: `${site.origin}/business/${listing.slug}`,
   telephone: listing.phone,
   address: { "@type": "PostalAddress", streetAddress: listing.address },
@@ -79,33 +87,63 @@ if (listing.rating && listing.reviewCount) {
 
 <BaseLayout
   title={`${listing.businessName} — ${listing.category} in ${site.market}`}
-  description={listing.description}
+  description={descriptionText}
   widget="none"
 >
   <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-  <article class:list={[hue, "mx-auto max-w-3xl px-5 pt-10 pb-16"]}>
-    <a href={`/category/${categorySlug(listing.category)}`} class="meta hue-fg font-bold">
-      &larr; {listing.category}
-    </a>
+  <article class:list={[hue, "mx-auto max-w-6xl px-5 pt-10 pb-16"]}>
+    {/* Goes back to wherever the visitor came from (search results, a
+        category page, a county page, ...) rather than always assuming
+        category — the category is already shown right below the name, so
+        a category-specific back link was redundant. Falls back to
+        /listings when there's no in-site history to go back to (e.g. a
+        direct link). */}
+    <div class="flex items-center justify-between gap-4">
+      <a href="/listings" data-back class="meta hue-fg font-bold">
+        &larr; Back
+      </a>
+      <div class="flex items-center gap-4">
+        {/* Only visible with an active admin session — see [data-admin-only]
+            in global.css and the pre-paint script in BaseLayout.astro. Jumps
+            straight into this listing's editor instead of making you search
+            for it from /manage/admin. */}
+        <a
+          href={`/manage/admin/${listing.slug}`}
+          data-admin-only
+          class="hue-block chip"
+        >
+          Edit this listing
+        </a>
+        <button type="button" data-share class="meta font-bold hover:text-signal">
+          Share this listing
+        </button>
+      </div>
+    </div>
 
-    {
-      cover && (
-        <img
-          src={cover}
-          alt={listing.businessName}
-          class="mt-4 aspect-[16/7] w-full object-cover"
-        />
-      )
-    }
-
-    <div class="rule-capped mt-6 pt-5">
+    <div class="rule-capped mt-4 pt-5">
       <p class="meta flex flex-wrap items-center gap-2">
         <span class="hue-fg font-bold">{listing.category}</span>
         {isPaid && plan && <span class="hue-block chip">&#9733; {plan.name}</span>}
         {listing.claimStatus === "claimed" && <span>&middot; Claimed by owner</span>}
       </p>
       <h1 class="font-display mt-3 text-mast">{listing.businessName}</h1>
+      <p class="mt-2 text-sm text-ink-soft">
+        {listing.address}
+        {
+          listing.county && (
+            <>
+              {" "}&middot;{" "}
+              <a
+                href={`/county/${countySlug(listing.county)}/${categorySlug(listing.category)}`}
+                class="hue-fg font-bold"
+              >
+                {listing.category} in {listing.county} County &rarr;
+              </a>
+            </>
+          )
+        }
+      </p>
       {
         listing.rating && (
           <p class="meta hue-fg mt-3 font-bold">
@@ -115,84 +153,140 @@ if (listing.rating && listing.reviewCount) {
       }
     </div>
 
-    <p class="mt-6 text-sub text-ink-soft">{listing.description}</p>
-
-    <dl class="mt-8 grid grid-cols-1 gap-x-8 gap-y-5 border-t-2 border-rule pt-6 text-sm sm:grid-cols-2">
-      <div>
-        <dt class="meta">Address</dt>
-        <dd class="mt-1">{listing.address}</dd>
+    <div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
+      {/* Main column: photos, then the long-form description. */}
+      <div class="lg:col-span-2">
         {
-          listing.county && (
-            <dd class="mt-1">
-              <a
-                href={`/county/${countySlug(listing.county)}/${categorySlug(listing.category)}`}
-                class="meta hue-fg font-bold"
-              >
-                {listing.category} in {listing.county} County &rarr;
-              </a>
-            </dd>
+          cover && (
+            <div data-gallery>
+              <img
+                src={cover}
+                alt={listing.businessName}
+                data-gallery-main
+                class="aspect-[16/9] w-full border-2 border-rule object-cover"
+              />
+              {
+                gallery.length > 0 && (
+                  <div data-gallery-thumbs class="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {[cover, ...gallery].map((src, i) => (
+                      <button
+                        type="button"
+                        data-src={src}
+                        aria-label={`Show photo ${i + 1}`}
+                        class:list={[
+                          "size-16 shrink-0 border-2 object-cover",
+                          i === 0 ? "border-signal" : "border-rule",
+                        ]}
+                        style={`background-image:url(${src});background-size:cover;background-position:center;`}
+                      />
+                    ))}
+                  </div>
+                )
+              }
+            </div>
           )
         }
-      </div>
-      <div>
-        <dt class="meta">Phone</dt>
-        <dd class="mt-1">
-          <a href={`tel:${listing.phone}`} class="hue-fg font-bold">{listing.phone}</a>
-        </dd>
-      </div>
-      {
-        listing.hours && (
-          <div>
-            <dt class="meta">Hours</dt>
-            <dd class="mt-1">{listing.hours}</dd>
-          </div>
-        )
-      }
-      {
-        listing.website && (
-          <div>
-            <dt class="meta">Website</dt>
-            <dd class="mt-1">
-              <a href={listing.website} rel="nofollow noopener" class="hue-fg font-bold">
-                Visit site &rarr;
-              </a>
-            </dd>
-          </div>
-        )
-      }
-    </dl>
 
-    {
-      socials.length > 0 && (
-        <div class="mt-6 flex flex-wrap gap-2">
-          {socials.map(([network, url]) => (
-            <a href={url} rel="nofollow noopener" class="chip hue-block">
-              {network}
-            </a>
-          ))}
+        <div class="mt-8 border-t-2 border-rule pt-6">
+          <h2 class="meta mb-3">Business Description</h2>
+          {/* set:html is safe here — descriptionHtml came from our own
+              sanitized renderer (src/lib/markdown.ts), never straight from
+              stored input. No links, no raw HTML, ever — see that file. */}
+          <div class="aeo-content text-sub text-ink-soft" set:html={descriptionHtml} />
         </div>
-      )
-    }
+      </div>
 
-    {
-      gallery.length > 0 && (
-        <div class="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {gallery.map((src) => (
-            <img src={src} alt="" loading="lazy" class="aspect-square w-full object-cover" />
-          ))}
+      {/* Sidebar: AI teaser (only when this business actually has an agent
+          built — see hasListingAgent()), contact card, map. */}
+      <div class="space-y-5 lg:col-span-1">
+        {
+          showsAgent && (
+            <div class="hue-block flex items-center gap-3 border-2 border-rule px-4 py-3">
+              <span class="text-xl" aria-hidden="true">&#128172;</span>
+              <div>
+                <p class="text-sm font-bold">Ask {listing.businessName}</p>
+                <p class="text-xs opacity-80">Chat with the assistant in the corner &darr;</p>
+              </div>
+            </div>
+          )
+        }
+
+        <div class="border-2 border-rule p-4">
+          <div class="flex items-center gap-3">
+            {
+              listing.logoUrl && (
+                <img
+                  src={listing.logoUrl}
+                  alt={`${listing.businessName} logo`}
+                  class="h-12 w-12 border-2 border-rule bg-paper object-contain"
+                />
+              )
+            }
+            <div class="min-w-0">
+              <p class="truncate font-display font-bold">{listing.businessName}</p>
+              {
+                listing.website && (
+                  <a
+                    href={listing.website}
+                    target="_blank"
+                    rel="nofollow noopener"
+                    class="mt-1 inline-block bg-signal px-3 py-1.5 text-xs font-bold text-paper hover:bg-signal-sunk"
+                  >
+                    Visit website &rarr;
+                  </a>
+                )
+              }
+            </div>
+          </div>
+
+          <dl class="mt-4 space-y-3 text-sm">
+            <div>
+              <dt class="meta">Phone</dt>
+              <dd class="mt-0.5">
+                <a href={`tel:${listing.phone}`} class="hue-fg font-bold">{listing.phone}</a>
+              </dd>
+            </div>
+            {
+              listing.hours && (
+                <div>
+                  <dt class="meta">Hours</dt>
+                  <dd class="mt-0.5">{listing.hours}</dd>
+                </div>
+              )
+            }
+          </dl>
+
+          {
+            socials.length > 0 && (
+              <div class="mt-4 flex flex-wrap gap-2">
+                {socials.map(([network, url]) => (
+                  <SocialIcon network={network} href={url} />
+                ))}
+              </div>
+            )
+          }
+
+          <div class="mt-4 border-t-2 border-rule pt-4 text-sm">
+            {
+              listing.claimStatus === "claimed" ? (
+                <span class="hue-block chip">Claimed</span>
+              ) : (
+                <a href={`/claim?t=${listing.id}`} class="hue-fg font-bold">
+                  Is this your business? Claim it &rarr;
+                </a>
+              )
+            }
+          </div>
         </div>
-      )
-    }
 
-    <div class="mt-8">
-      <p class="meta mb-2">Find them</p>
-      <iframe
-        title={`Map showing ${listing.businessName}`}
-        src={`https://maps.google.com/maps?q=${mapQuery}&output=embed`}
-        loading="lazy"
-        referrerpolicy="no-referrer-when-downgrade"
-        class="aspect-[16/9] w-full border-2 border-rule"
-      />
+        <iframe
+          title={`Map showing ${listing.businessName}`}
+          src={`https://maps.google.com/maps?q=${mapQuery}&output=embed`}
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          class="aspect-square w-full border-2 border-rule"
+        />
+      </div>
     </div>
 
     {
@@ -241,4 +335,54 @@ if (listing.rating && listing.reviewCount) {
   </article>
 
   {showsAgent ? <ListingAgentWidget listing={listing} /> : <DirectoryWidget />}
+
+  <script>
+    // "Back" goes to wherever the visitor actually came from within the
+    // site, not a fixed category link — falls back to the href (/listings)
+    // when there's nothing to go back to, e.g. someone landed here directly.
+    document.querySelectorAll<HTMLAnchorElement>("[data-back]").forEach((link) => {
+      if (document.referrer && new URL(document.referrer).origin === location.origin) {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          history.back();
+        });
+      }
+    });
+
+    // Photo gallery: click a thumbnail, it becomes the big image. Thumbnails
+    // scroll horizontally when there are more than fit on screen.
+    document.querySelectorAll<HTMLElement>("[data-gallery]").forEach((root) => {
+      const main = root.querySelector<HTMLImageElement>("[data-gallery-main]")!;
+      const thumbs = root.querySelectorAll<HTMLButtonElement>("[data-gallery-thumbs] button");
+      thumbs.forEach((thumb) => {
+        thumb.addEventListener("click", () => {
+          const src = thumb.dataset.src;
+          if (!src) return;
+          main.src = src;
+          thumbs.forEach((t) => t.classList.toggle("border-signal", t === thumb));
+          thumbs.forEach((t) => t.classList.toggle("border-rule", t !== thumb));
+        });
+      });
+    });
+
+    // Share: native share sheet where available, clipboard-copy fallback.
+    // No login, no backend — works for every visitor.
+    document.querySelectorAll<HTMLButtonElement>("[data-share]").forEach((btn) => {
+      const label = btn.textContent;
+      btn.addEventListener("click", async () => {
+        const shareData = { title: document.title, url: location.href };
+        if (navigator.share) {
+          try {
+            await navigator.share(shareData);
+          } catch {
+            // user cancelled the share sheet — not an error
+          }
+          return;
+        }
+        await navigator.clipboard.writeText(location.href);
+        btn.textContent = "Link copied!";
+        setTimeout(() => (btn.textContent = label), 2000);
+      });
+    });
+  </script>
 </BaseLayout>

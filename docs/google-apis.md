@@ -100,8 +100,19 @@ When Google reviews get wired up:
    `google_review_count` already exist as custom fields (see
    [ghl-layer-0.md](ghl-layer-0.md)), so golden rule 1 still holds.
 
-**Built:** [`scripts/import-reviews.mjs`](../scripts/import-reviews.mjs) — run
-it manually or on a cron/GitHub Action, never from `npm run build`:
+**Built, two complementary paths:**
+
+1. **Automatic one-time backfill on upgrade** —
+   [`src/pages/api/webhooks/reviews.ts`](../src/pages/api/webhooks/reviews.ts),
+   called by a GHL workflow the moment a listing becomes paid (see
+   [ghl-layer-0.md](ghl-layer-0.md)). Fetches once per listing, ever — a
+   listing that already has a `google_rating` is always a free no-op, no
+   matter how many times the workflow fires. This is what makes "flip a
+   listing to paid" show a rating without running anything by hand.
+2. **Scheduled refresh** — [`scripts/import-reviews.mjs`](../scripts/import-reviews.mjs),
+   run manually or on a cron/GitHub Action, never from `npm run build`, for
+   keeping *already-fetched* ratings from going stale (a rating doesn't
+   change the moment it's fetched, but it does drift over months):
 
 ```
 npm run reviews                     # refresh anything stale (default: 7+ days)

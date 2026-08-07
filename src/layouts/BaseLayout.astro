@@ -14,6 +14,7 @@ import "../styles/global.css";
 import { site } from "../config/site";
 import SiteHeader from "../components/SiteHeader.astro";
 import DirectoryWidget from "../components/DirectoryWidget.astro";
+import FollowButtons from "../components/FollowButtons.astro";
 
 interface Props {
   title: string;
@@ -80,6 +81,25 @@ const channels = site.channels.filter((c) => c.url);
       // the bundle fails.
       document.documentElement.classList.add("js");
     </script>
+    <script is:inline>
+      // Consumer auth state, pre-paint — same reasoning as the theme script
+      // above: flips SiteHeader's Login/Register vs Profile/Logout blocks
+      // (and gates FollowButtons.astro's fetch) with zero flash and zero
+      // network round-trip. consumer_hint is non-httpOnly and carries no real
+      // information — see src/lib/auth.ts — every actual account action
+      // re-verifies the real session cookie server-side regardless.
+      document.documentElement.dataset.consumer = document.cookie.includes("consumer_hint=1")
+        ? "in"
+        : "out";
+      // Same mechanism for an admin session — a separate axis, not a third
+      // value of the consumer one, since they're independent identity
+      // systems (src/lib/auth.ts). Drives the header's Admin/Sign-out block
+      // and any page's [data-admin-only] elements (e.g. business/[slug]'s
+      // "Edit this listing" link).
+      document.documentElement.dataset.admin = document.cookie.includes("admin_hint=1")
+        ? "in"
+        : "out";
+    </script>
   </head>
 
   <body class="min-h-screen">
@@ -109,7 +129,7 @@ const channels = site.channels.filter((c) => c.url);
           channels.length > 0 && (
             <div class="mt-6 flex flex-wrap gap-2">
               {channels.map((c) => (
-                <a href={c.url} rel="noopener" class="chip hue-block">
+                <a href={c.url} target="_blank" rel="noopener" class="chip hue-block">
                   {c.name}
                 </a>
               ))}
@@ -128,6 +148,7 @@ const channels = site.channels.filter((c) => c.url);
     </footer>
 
     {widget === "directory" && <DirectoryWidget />}
+    <FollowButtons />
 
     <script>
       // Reveal tiles as they scroll in, staggered a little within each row.

@@ -143,6 +143,28 @@ const categories = [...known].sort();
         </div>
       </div>
 
+      <div class="border-t-2 border-rule pt-5">
+        <p class="meta mb-1.5">Social media (optional)</p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          {[
+            ["facebook", "Facebook"],
+            ["instagram", "Instagram"],
+            ["x", "X (Twitter)"],
+            ["linkedin", "LinkedIn"],
+            ["tiktok", "TikTok"],
+            ["youtube", "YouTube"],
+          ].map(([key, label]) => (
+            <input
+              name={`social_${key}`}
+              type="url"
+              placeholder={label}
+              aria-label={label}
+              class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+            />
+          ))}
+        </div>
+      </div>
+
       <label class="flex gap-3 border-t-2 border-rule pt-5 text-xs leading-relaxed text-ink-soft">
         <input type="checkbox" name="tcpaConsent" class="mt-0.5 shrink-0" />
         <span>{TCPA_CONSENT_TEXT}</span>
@@ -162,6 +184,7 @@ const categories = [...known].sort();
   const ERRORS: Record<string, string> = {
     missing: "Please fill in the required fields.",
     email: "That email address doesn't look right.",
+    social: "Social media links must be full https:// URLs.",
     server: "Something went wrong on our end — please try again in a moment.",
   };
   const error = new URLSearchParams(location.search).get("error");

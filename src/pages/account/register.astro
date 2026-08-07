@@ -1,0 +1,95 @@
+---
+// Consumer registration — first/last name, email, phone, TCPA consent.
+// Same fields/consent mechanism as the business side (src/lib/consent.ts),
+// even though nothing here triggers SMS/voice outreach to consumers today —
+// kept consistent rather than inventing a second consent flow.
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+import { TCPA_CONSENT_TEXT } from "../../lib/consent";
+
+const errorCode = Astro.url.searchParams.get("error");
+const ERRORS: Record<string, string> = {
+  missing: "Please fill in your name, phone, and email.",
+  email: "That email address doesn't look right.",
+  server: "Something went wrong on our end — please try again in a moment.",
+};
+const errorMessage = errorCode ? ERRORS[errorCode] ?? ERRORS.server : null;
+---
+
+<BaseLayout title={`Register — ${site.name}`} description="Create a free account." widget="none">
+  <section class="mx-auto max-w-xl px-5 py-14">
+    <div class="rule-capped pt-5">
+      <h1 class="font-display text-head">Create an account</h1>
+      <p class="mt-3 text-sub text-ink-soft">
+        Follow your favorite local businesses and get back to them fast. Free, no password to remember.
+      </p>
+    </div>
+
+    {errorMessage && (
+      <p class="mt-6 border-2 border-signal bg-signal/10 px-4 py-3 text-sm font-semibold text-signal-sunk">
+        {errorMessage}
+      </p>
+    )}
+
+    <form method="POST" action="/api/account/register" class="mt-8 space-y-5">
+      <input
+        type="text"
+        name="hp"
+        tabindex={-1}
+        autocomplete="off"
+        aria-hidden="true"
+        class="absolute -left-[9999px] h-0 w-0 opacity-0"
+      />
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="firstName" class="meta mb-1.5 block">First name</label>
+          <input
+            id="firstName" name="firstName" type="text" required
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+        <div>
+          <label for="lastName" class="meta mb-1.5 block">Last name</label>
+          <input
+            id="lastName" name="lastName" type="text" required
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label for="email" class="meta mb-1.5 block">Email</label>
+        <input
+          id="email" name="email" type="email" required
+          class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label for="phone" class="meta mb-1.5 block">Phone</label>
+        <input
+          id="phone" name="phone" type="tel" required
+          class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+        />
+      </div>
+
+      <label class="flex gap-3 border-t-2 border-rule pt-5 text-xs leading-relaxed text-ink-soft">
+        <input type="checkbox" name="tcpaConsent" class="mt-0.5 shrink-0" />
+        <span>{TCPA_CONSENT_TEXT}</span>
+      </label>
+
+      <button
+        type="submit"
+        class="w-full bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk"
+      >
+        Create account &rarr;
+      </button>
+    </form>
+
+    <p class="mt-6 text-sm text-ink-soft">
+      Already have an account? <a href="/account/login" class="hue-fg font-bold">Log in &rarr;</a>
+    </p>
+  </section>
+</BaseLayout>

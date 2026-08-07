@@ -1,0 +1,81 @@
+---
+// Owner self-serve login — email-only, passwordless magic link. Thin form
+// page + on-demand API route, same split as claim.astro/api/claim.ts.
+// Static-renderable: no listing lookup happens here (an email isn't known to
+// belong to a listing until request-link.ts checks — see its comment on why
+// this route never confirms or denies a match).
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { site } from "../../config/site";
+
+const errorCode = Astro.url.searchParams.get("error");
+const sent = Astro.url.searchParams.get("sent") === "1";
+
+const ERRORS: Record<string, string> = {
+  expired: "That link has expired. Request a new one below.",
+  ineligible: "That listing isn't eligible for self-serve editing right now.",
+};
+const errorMessage = errorCode ? ERRORS[errorCode] ?? null : null;
+---
+
+<BaseLayout
+  title={`Manage your listing — ${site.name}`}
+  description="Sign in to edit your business listing's photos, description and links."
+  widget="none"
+>
+  <section class="mx-auto max-w-xl px-5 py-14">
+    <div class="rule-capped pt-5">
+      <h1 class="font-display text-head">Manage your listing</h1>
+      <p class="mt-3 text-sub text-ink-soft">
+        Enter the email on file for your claimed listing and we'll send you a sign-in link.
+        Self-serve editing is available on Spotlight and All Access listings.
+      </p>
+    </div>
+
+    {
+      sent ? (
+        <p class="mt-8 border-2 border-ink bg-paper-sunk px-4 py-3 text-sm font-semibold text-ink">
+          If that email is on file, a sign-in link is on its way. It expires in 15 minutes.
+        </p>
+      ) : (
+        <>
+          {errorMessage && (
+            <p class="mt-6 border-2 border-signal bg-signal/10 px-4 py-3 text-sm font-semibold text-signal-sunk">
+              {errorMessage}
+            </p>
+          )}
+
+          <form method="POST" action="/api/manage/request-link" class="mt-8 space-y-5">
+            {/* Honeypot — real visitors never see or fill this in. */}
+            <input
+              type="text"
+              name="hp"
+              tabindex={-1}
+              autocomplete="off"
+              aria-hidden="true"
+              class="absolute -left-[9999px] h-0 w-0 opacity-0"
+            />
+
+            <div>
+              <label for="email" class="meta mb-1.5 block">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              class="w-full bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk"
+            >
+              Send sign-in link &rarr;
+            </button>
+          </form>
+        </>
+      )
+    }
+  </section>
+</BaseLayout>

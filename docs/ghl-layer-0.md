@@ -58,11 +58,15 @@ anything human-readable.
 | `google_review_count` | Number | `reviewCount` |
 | `google_place_id` | Text | `placeId` — captured automatically by `scripts/find-businesses.mjs` at sourcing time (free `places.id` field, see [google-apis.md](google-apis.md)); for anything sourced another way, fill by hand (Google Business Profile → Share → the id in the URL, or the [Place ID Finder](https://developers.google.com/maps/documentation/places/web-service/place-id)). Only matters for **paid** listings — `scripts/import-reviews.mjs` skips any paid listing without one rather than guessing by name/address. |
 | `image_urls` | Multi-line | `imageUrls` (newline- or comma-separated) |
+| `logo_url` | Text | `logoUrl` — separate from `imageUrls[0]`/cover photo. Written by the owner self-serve/admin editor (`/manage`, `/manage/admin`), points to a Vercel Blob URL |
+| `youtube_url` | Text | `youtubeUrl` — curated safe embed, validated as a YouTube URL server-side before write, never rendered as raw HTML |
+| `booking_url` | Text | `bookingUrl` — curated safe embed (e.g. Calendly), validated as `https://` server-side before write |
 | `hours` | Multi-line | `hours` |
 | `social_links` | Multi-line | `socialLinks` (`instagram=https://…` per line) |
 | `plan_tier` | Dropdown: `Free` \| `Featured` \| `Premium` | `planTier` — Day Pass / Spotlight / All Access on `/pricing`; `normalizePlanTier()` also accepts "Spotlight"/"All Access" as synonyms. Upgraded automatically by Stripe checkout (Layer 4) once live. |
 | `claim_status` | Dropdown: `Unclaimed` \| `Pending` \| `Claimed` | `claimStatus` |
 | `ai_context` | Multi-line | `aiContext` — knowledge for the All Access per-listing agent (Layer 5) |
+| `ai_agent_enabled` | Checkbox | `aiAgentEnabled` — Premium alone does NOT show the "Ask this business" card/widget; this must also be checked, by hand, once a real agent has actually been built for that specific business. Defaults unchecked/false on every listing, including new Premium ones. See `hasListingAgent()` in `src/types/listing.ts`. |
 | `agency_client` | Checkbox | `agencyClient` |
 | `client_location_id` | Text | `clientLocationId` — their own sub-account, once they're an agency client |
 | `tcpa_consent` | Checkbox | Written on every claim/add-business submission, consented or not |
@@ -87,13 +91,21 @@ but nothing reads or writes it today:
 
 | Tag | Meaning |
 |---|---|
-| `business` | **Makes the contact a listing.** Remove it and the listing disappears from the live site. |
+| `business` | **Makes the contact a listing.** Remove it and the listing disappears from the live site — but only after the next build; see section 7 for making that automatic. |
 | `new_business_request` | Self-submitted via `/add-business`, **not yet a live listing**. Review in GHL and add `business` yourself to publish it. |
 | `directory_lead` | Came in via the directory outreach, not yet engaged — apply this when you first import a prospect, before any workflow touches them. |
 | `dir_engaged` | Opened/clicked/replied to outreach — a workflow "add tag" action, not manual. |
 | `dir_claimed` | Claimed their listing — a hot lead. Added automatically by `submitClaim()` in `src/lib/submissions.ts`. |
 | `opt_in_voice` | Consented to AI-assisted calls (the `tcpaConsent` checkbox was checked on claim) — the outbound-call trigger. Added automatically by `submitClaim()`, only when consent was given. |
 | `dir_opt_out` | Suppress everything — respect this in every workflow's filter. |
+| `consumer` | **A visitor account, not a listing.** Set by `registerConsumer()` in `src/lib/consumer-submissions.ts` — deliberately never co-occurs with `business` on the same contact, even if the same person also owns a claimed listing under a different contact record. See `docs/consumer-accounts.md`. |
+
+### Consumer-only custom fields (never used by `Listing`)
+
+| Key | Type | Purpose |
+|---|---|---|
+| `avatar_url` | Text | Consumer's profile photo — Vercel Blob URL, written from `/account`. |
+| `followed_listings` | Multi-line | Comma-separated listing slugs this consumer follows — same CSV-in-a-text-field convention as `image_urls`. |
 
 ## 4. Private Integration token
 
@@ -154,6 +166,99 @@ On import, choose "add tag to imported contacts" and apply **both**
 `business` and `directory_lead` — every row becomes a live listing *and* is
 marked ready for the Layer 3 outreach sequence in one pass.
 
+## 7. Keeping the live site in sync — Vercel Deploy Hook
+
+The site is a **static build** (see repo facts in `CLAUDE.md`) — every listing
+page is prerendered HTML, not a live per-request GHL fetch. That means adding
+`business`, removing it, or editing any "Live now" field in section 2 does
+**nothing** on the live site until the next build. Without this section,
+"remove the tag to pull a listing" (the workflow described in the `business`
+row of section 3) requires you to manually trigger a redeploy every time —
+easy to forget, and the gap between "tag removed in GHL" and "listing
+actually gone from the live site" is a real problem the one time it matters
+(a business owner asking to be pulled).
+
+**Fix: a Vercel Deploy Hook, fired by a GHL workflow, on any change to a
+`business`-tagged contact.**
+
+**Vercel side** (dashboard, not code): Project → Settings → Git → Deploy
+Hooks → create one (name it something like "GHL contact sync"), targeting the
+`main` branch (or whatever branch production deploys from). Vercel gives you
+a POST URL, e.g. `https://api.vercel.com/v1/integrations/deploy/prj_xxx/xxx`.
+Hitting it with an empty POST kicks a fresh build — no payload, no auth
+beyond the URL itself, so treat the URL as a secret (anyone with it can
+trigger builds, though not read or write data).
+
+**GHL side** (dashboard, Workflows): build one workflow with two triggers —
+"Contact Tag Added" and "Contact Tag Removed" — both scoped to the `business`
+tag specifically (not "Contact Updated" broadly, or unrelated CRM edits on
+every contact burn a build). Action: Webhook → POST to the Deploy Hook URL.
+If you also want field edits (e.g. correcting an address, changing
+`plan_tier` by hand) to go live without a manual redeploy, add a third
+trigger — "Contact Updated," filtered to contacts already tagged `business` —
+to the same workflow.
+
+A build takes ~1–2 minutes on Vercel, so there's a short lag between the GHL
+change and it going live — expected, not a bug.
+
+### Auto-backfilling Google ratings on upgrade (`src/pages/api/webhooks/reviews.ts`)
+
+`npm run reviews` (see [google-apis.md](google-apis.md)) is still how ratings
+get *refreshed* on a schedule, but a **new** paid listing doesn't have to
+wait for that — a second GHL workflow can call a webhook the moment a
+contact becomes paid, so the rating shows up without you running anything.
+
+**Vercel side:** nothing to create in the dashboard this time — it's already
+a route in the app (`/api/webhooks/reviews`). Set `REVIEWS_WEBHOOK_SECRET`
+in your env (local `.env` and Vercel's Environment Variables) to any random
+string; the route 403s without the matching `?secret=` query param.
+
+**GHL side** (dashboard, Workflows): a workflow triggered by **"Contact Tag
+Added"** (`business`) and/or **"Contact Updated"** filtered to contacts
+already tagged `business` — the same triggers as the Deploy Hook workflow
+above, this can be a second action on that *same* workflow rather than a new
+one. Action: Webhook → POST to
+`https://<your-domain>/api/webhooks/reviews?secret=<REVIEWS_WEBHOOK_SECRET>`.
+
+**What it actually does, and why it's safe to fire repeatedly:** the route
+re-fetches the contact fresh from GHL (never trusts the webhook body for
+the decision — GHL's webhook payload shape is configurable per-workflow, not
+something to build billing logic on), and only calls the Places API if the
+contact is tagged `business`, on a paid `plan_tier`, has a `google_place_id`,
+**and doesn't already have a `google_rating` value**. That last check is the
+actual cost guardrail — once a listing has been fetched once, every future
+"Contact Updated" fire for that same contact (correcting an address, editing
+the description, anything) is a free no-op. It never re-bills a listing that
+already has a rating; that's still `npm run reviews`'s job, on your schedule.
+
+**Unverified, flagged honestly:** GHL's webhook POST body shape wasn't
+confirmed against a live payload — the route tries `contact_id`, `contactId`,
+`contact.id`, and `id` at the top level. Smoke-test against a real workflow
+fire and adjust `src/pages/api/webhooks/reviews.ts` if your workflow's
+payload shape doesn't match one of those.
+
+### Owner self-serve / admin editing (`src/pages/manage/*`)
+
+Claimed, paid-tier owners can sign in at `/manage` (passwordless magic-link,
+email must match the contact's native `email` field, set at claim time) to
+edit their description, photo gallery, logo, and the two curated embeds above.
+You can also edit **any** listing — claimed or not, any tier — at
+`/manage/admin` behind a separate shared password (`ADMIN_PASSWORD`), on a
+client's behalf.
+
+Both write through `submitListingUpdate()` in `src/lib/submissions.ts`, a
+plain `PUT /contacts/:id` with no `tags` key — this is exactly the kind of
+"Contact Updated" change this section's Deploy Hook already covers. If you've
+added the optional "Contact Updated" trigger above, a saved self-serve edit
+auto-triggers a rebuild with no extra code. If not, the edit still saves
+correctly but waits for the next rebuild like any other GHL change — not a
+bug in the editor.
+
+Photos/logos upload directly to Vercel Blob (`BLOB_READ_WRITE_TOKEN`), never
+through GHL — GHL custom fields only ever hold the resulting URL string. See
+`docs/consumer-accounts.md` for the auth design (magic-link tokens, session
+cookies, no users table).
+
 ## Layer 2 — the write path (already built)
 
 `src/lib/submissions.ts` mirrors `directory.ts`'s `DATA_SOURCE` switch.
@@ -163,6 +268,25 @@ overwriting the contact's `tags` array, which would silently strip `business`
 and unpublish the listing. `submitAddBusiness()` creates a new contact tagged
 `new_business_request` — deliberately **not** `business`, so a self-submitted
 listing stays off the live directory until reviewed and tagged manually.
+
+### Getting notified about a new `/add-business` submission
+
+Review today is fully manual — nothing tells you a submission came in, you
+only see it by checking GHL. A two-minute GHL workflow fixes that, same
+"trigger → action" shape as every other workflow in this doc:
+
+**Trigger:** "Contact Tag Added" → `new_business_request`.
+**Action:** whatever you want to be notified with — an internal email/SMS
+to yourself, a Slack/Teams webhook, GHL's own "Send Internal Notification"
+action if your plan has it. No webhook to this app needed for this one —
+it's purely GHL notifying **you**, not GHL notifying the site.
+
+Once you've reviewed a submission and are happy with it, publishing is still
+the same manual step as always: add the `business` tag yourself (and fill in
+anything worth improving first — see the description note in
+`docs/ai-descriptions.md`; nothing regenerates a self-submitted description
+automatically, so touching it up before publishing is a manual/human step,
+same as reviewing the rest of the submission).
 
 `directory.ts`'s read path resolves GHL's per-field `id` back to the `key`
 above via a cached `GET /locations/:locationId/customFields` call (contact

@@ -30,10 +30,19 @@ export const POST: APIRoute = async ({ request, clientAddress, redirect }) => {
   const ownerName = String(data.get("ownerName") ?? "").trim();
   const tcpaConsent = data.get("tcpaConsent") === "on";
 
+  const socialLinks: Record<string, string> = {};
+  for (const network of ["facebook", "instagram", "x", "linkedin", "tiktok", "youtube"]) {
+    const url = String(data.get(`social_${network}`) ?? "").trim();
+    if (url) socialLinks[network] = url;
+  }
+
   if (!businessName || !category || !address || !phone || !email) {
     return redirect("/add-business?error=missing");
   }
   if (!EMAIL_RE.test(email)) return redirect("/add-business?error=email");
+  for (const url of Object.values(socialLinks)) {
+    if (!url.startsWith("https://")) return redirect("/add-business?error=social");
+  }
 
   const result = await submitAddBusiness({
     businessName,
@@ -44,6 +53,7 @@ export const POST: APIRoute = async ({ request, clientAddress, redirect }) => {
     website: website || undefined,
     description: description || undefined,
     ownerName: ownerName || undefined,
+    socialLinks: Object.keys(socialLinks).length ? socialLinks : undefined,
     tcpaConsent,
     consentVersion: TCPA_CONSENT_VERSION,
     ip: clientAddress,

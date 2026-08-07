@@ -1,0 +1,134 @@
+// POST /api/manage/update — saves an owner's (or admin's, on an owner's
+// behalf) listing edits: description, gallery order, logo, curated embeds.
+// JSON body, cookie-authenticated — see isSameOrigin() for why this needs its
+// own CSRF check (Astro's default only covers form-like content types).
+
+export const prerender = false;
+
+import type { APIRoute } from "astro";
+import { del } from "@vercel/blob";
+import { getListingById } from "../../../lib/directory";
+import { submitListingUpdate } from "../../../lib/submissions";
+import { verifySession, isSameOrigin, SESSION_COOKIE } from "../../../lib/auth";
+import { renderDescriptionHtml } from "../../../lib/markdown";
+
+const YOUTUBE_RE = /^https:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/;
+const SOCIAL_NETWORKS = ["facebook", "instagram", "x", "linkedin", "tiktok", "youtube"];
+// 10,000 chars comfortably fits a full AEO-style long-form description (a
+// real example ran ~4,300 chars / 590 words) with headroom to spare. Not
+// based on any confirmed GHL field limit — just a sane upper bound against
+// someone pasting something absurd, raised from an earlier arbitrary 2,000.
+const DESCRIPTION_MAX = 10000;
+
+export const POST: APIRoute = async ({ request, cookies }) => {
+  if (!isSameOrigin(request)) {
+    return json({ ok: false, error: "bad origin" }, 403);
+  }
+
+  const session = verifySession(cookies.get(SESSION_COOKIE)?.value);
+  if (!session) return json({ ok: false, error: "not signed in" }, 401);
+
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: "invalid body" }, 400);
+
+  // Owner sessions may only ever edit their own listing — the client-supplied
+  // listingId is ignored in favor of the session's own contact id. Admin
+  // sessions may edit any listing that actually exists.
+  const listingId = session.kind === "owner" ? session.contactId : String(body.listingId ?? "");
+  const listing = await getListingById(listingId);
+  if (!listing) return json({ ok: false, error: "listing not found" }, 404);
+
+  // Defense in depth: re-check the claim/tier gate for owner sessions even
+  // though request-link/verify/the dashboard already checked it — status can
+  // change mid-session (downgrade, unclaim) and this is the actual mutation.
+  if (session.kind === "owner") {
+    const isPaid = listing.planTier !== "free";
+    if (listing.claimStatus !== "claimed" || !isPaid) {
+      return json({ ok: false, error: "listing is no longer eligible" }, 403);
+    }
+  }
+
+  const description = String(body.description ?? "").trim();
+  if (!description) return json({ ok: false, error: "description is required" }, 400);
+  if (description.length > DESCRIPTION_MAX) {
+    return json({ ok: false, error: `description must be under ${DESCRIPTION_MAX} characters` }, 400);
+  }
+  // description is stored as markdown source (src/lib/markdown.ts renders it
+  // safely on every read) — this doesn't change what's saved, it just fails
+  // fast here for the one owner/admin if rendering ever throws, rather than
+  // at page-build time for every visitor.
+  try {
+    renderDescriptionHtml(description);
+  } catch {
+    return json({ ok: false, error: "description could not be rendered — check formatting" }, 400);
+  }
+
+  const imageUrls = Array.isArray(body.imageUrls) ? body.imageUrls.map(String) : [];
+  const logoUrl = body.logoUrl ? String(body.logoUrl) : undefined;
+  for (const url of logoUrl ? [...imageUrls, logoUrl] : imageUrls) {
+    if (!isBlobUrl(url)) return json({ ok: false, error: "invalid image url" }, 400);
+  }
+
+  const youtubeUrl = body.youtubeUrl ? String(body.youtubeUrl).trim() : undefined;
+  if (youtubeUrl && !YOUTUBE_RE.test(youtubeUrl)) {
+    return json({ ok: false, error: "invalid YouTube url" }, 400);
+  }
+
+  const bookingUrl = body.bookingUrl ? String(body.bookingUrl).trim() : undefined;
+  if (bookingUrl && !bookingUrl.startsWith("https://")) {
+    return json({ ok: false, error: "booking url must be https://" }, 400);
+  }
+
+  const socialLinks: Record<string, string> = {};
+  if (body.socialLinks && typeof body.socialLinks === "object") {
+    for (const network of SOCIAL_NETWORKS) {
+      const url = body.socialLinks[network] ? String(body.socialLinks[network]).trim() : "";
+      if (!url) continue;
+      if (!url.startsWith("https://")) {
+        return json({ ok: false, error: `${network} link must be https://` }, 400);
+      }
+      socialLinks[network] = url;
+    }
+  }
+
+  const result = await submitListingUpdate({
+    listingId,
+    description,
+    imageUrls,
+    logoUrl,
+    youtubeUrl,
+    bookingUrl,
+    socialLinks,
+  });
+  if (!result.ok) return json(result, 500);
+
+  // Clean up any Blob files the owner/admin removed from the gallery/logo —
+  // best-effort, must never fail the save itself.
+  const removed = [...listing.imageUrls, listing.logoUrl].filter(
+    (url): url is string => !!url && !imageUrls.includes(url) && url !== logoUrl
+  );
+  // Same explicit-token requirement as the upload routes — @vercel/blob
+  // doesn't see import.meta.env's copy of BLOB_READ_WRITE_TOKEN.
+  const blobToken = import.meta.env.BLOB_READ_WRITE_TOKEN;
+  await Promise.allSettled(removed.map((url) => del(url, { token: blobToken })));
+
+  return json({ ok: true }, 200);
+};
+
+function json(payload: unknown, status: number): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+// Rejects a hand-crafted POST pointing at an arbitrary external URL — every
+// real image URL here came from our own upload route (upload.ts), which only
+// ever hands back *.public.blob.vercel-storage.com URLs.
+function isBlobUrl(url: string): boolean {
+  try {
+    return new URL(url).host.endsWith(".public.blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}

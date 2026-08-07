@@ -1,0 +1,96 @@
+---
+// Admin listing picker — search any listing (claimed or not, any tier) and
+// jump to its editor. Reuses the same /search-index.json the public search
+// box already fetches (src/pages/search-index.json.ts) rather than building
+// a second index.
+
+export const prerender = false;
+
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { site } from "../../../config/site";
+import { verifySession, SESSION_COOKIE } from "../../../lib/auth";
+
+const session = verifySession(Astro.cookies.get(SESSION_COOKIE)?.value);
+if (!session || session.kind !== "admin") {
+  return Astro.redirect("/manage/admin/login");
+}
+---
+
+<BaseLayout title={`Admin — ${site.name}`} description="Pick a listing to edit." widget="none">
+  <section class="mx-auto max-w-2xl px-5 py-14">
+    <div class="rule-capped flex items-baseline justify-between pt-5">
+      <h1 class="font-display text-head">Edit a listing</h1>
+      <form method="POST" action="/api/manage/logout">
+        <button type="submit" class="meta font-bold hover:text-signal">Sign out</button>
+      </form>
+    </div>
+
+    <input
+      type="search"
+      data-admin-search
+      placeholder="Search by name, category, address or county"
+      autocomplete="off"
+      class="mt-8 w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+    />
+
+    <ul data-admin-results class="mt-3 divide-y-2 divide-rule border-2 border-rule"></ul>
+  </section>
+</BaseLayout>
+
+<script>
+  import type FuseType from "fuse.js";
+
+  type Row = { s: string; n: string; c: string; a: string; y: string; f: number };
+
+  const input = document.querySelector<HTMLInputElement>("[data-admin-search]")!;
+  const list = document.querySelector<HTMLUListElement>("[data-admin-results]")!;
+
+  let fusePromise: Promise<FuseType<Row>> | null = null;
+  function loadIndex(): Promise<FuseType<Row>> {
+    if (!fusePromise) {
+      fusePromise = Promise.all([
+        import("fuse.js").then((m) => m.default),
+        fetch("/search-index.json").then((r) => r.json() as Promise<Row[]>),
+      ]).then(
+        ([Fuse, rows]) =>
+          new Fuse(rows, {
+            keys: [
+              { name: "n", weight: 3 },
+              { name: "c", weight: 2 },
+              { name: "a", weight: 1 },
+              { name: "y", weight: 1 },
+            ],
+            threshold: 0.38,
+            ignoreLocation: true,
+          })
+      );
+    }
+    return fusePromise;
+  }
+
+  const escapeHtml = (s: string) =>
+    s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+  input.addEventListener("focus", () => void loadIndex());
+  input.addEventListener("input", async () => {
+    const q = input.value.trim();
+    if (q.length < 2) {
+      list.innerHTML = "";
+      return;
+    }
+    const fuse = await loadIndex();
+    const results = fuse.search(q, { limit: 20 });
+    list.innerHTML = results
+      .map(
+        (r) => `
+      <li>
+        <a href="/manage/admin/${r.item.s}" class="flex items-baseline gap-3 px-4 py-3 hover:bg-paper-sunk">
+          <span class="font-display font-bold">${escapeHtml(r.item.n)}</span>
+          <span class="meta">${escapeHtml(r.item.c)}</span>
+          <span class="meta ml-auto normal-case tracking-normal">${escapeHtml(r.item.a)}</span>
+        </a>
+      </li>`
+      )
+      .join("");
+  });
+</script>
