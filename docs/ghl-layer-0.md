@@ -168,11 +168,26 @@ marked ready for the Layer 3 outreach sequence in one pass.
 
 ## 7. Keeping the live site in sync — Vercel Deploy Hook
 
-**Status: done, live.** The GHL workflow ("Directory Live Sync") and Vercel
-Deploy Hook described below are both set up. Double-check the workflow's
-triggers are filtered to the `business` tag specifically, not left open to
-"any tag" — the AI workflow builder doesn't always scope this correctly on
-the first try.
+**Status: done, live, confirmed working both directions** (tag added → listing
+appears; tag removed → listing disappears; both automatic, no manual
+redeploy). Two real gotchas hit while setting this up, worth knowing before
+building the next GHL-workflow-triggered thing (e.g. the reviews webhook
+below):
+
+1. **Vercel env vars added via the dashboard don't apply to already-created
+   deployments** — clicking "Redeploy" on an old deployment can reuse stale
+   settings. After adding/changing env vars, trigger a genuinely fresh
+   deployment (push a commit, or let a real webhook fire one) rather than
+   assuming "Redeploy" alone picks them up.
+2. **Editing an already-published GHL workflow leaves the live version frozen
+   at whatever was last published** — new or changed triggers sit in an
+   unpublished draft until you explicitly hit Publish again. This is exactly
+   what happened here: the "Contact Tag Removed" trigger worked immediately,
+   while "Contact Tag Added" silently did nothing for a while, because only
+   the removed-trigger version of the workflow had ever actually been
+   published. If a trigger looks correctly configured but isn't firing,
+   check the workflow's publish status before assuming the trigger itself is
+   broken.
 
 The site is a **static build** (see repo facts in `CLAUDE.md`) — every listing
 page is prerendered HTML, not a live per-request GHL fetch. That means adding
