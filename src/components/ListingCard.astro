@@ -28,6 +28,7 @@ const hue = await hueClass(listing.category);
 // than only on /pricing.
 const plan = site.plans.find((p) => p.id === listing.planTier);
 const isPaid = isPaidTier(listing.planTier);
+const isClaimed = listing.claimStatus === "claimed";
 ---
 
 <div
@@ -62,13 +63,20 @@ const isPaid = isPaidTier(listing.planTier);
       )
     }
 
-    {
-      isPaid && plan && (
-        <span class="chip absolute left-0 top-0 bg-ink font-bold text-paper">
-          &#9733; {plan.name}
-        </span>
-      )
-    }
+    <div class="absolute left-0 top-0 z-20 flex flex-wrap gap-1 p-1.5">
+      {
+        isPaid && plan && (
+          <span class="chip bg-ink font-bold text-paper">&#9733; {plan.name}</span>
+        )
+      }
+      {
+        isClaimed ? (
+          <span class="chip border border-ink bg-paper/90 font-bold text-ink">Claimed</span>
+        ) : (
+          <span class="chip bg-signal font-bold text-paper">Claim It</span>
+        )
+      }
+    </div>
 
     {/* Inert by default (no JS/logged out) — FollowButtons.astro wires this
         up only when a consumer session's hint cookie is present. */}
@@ -92,7 +100,6 @@ const isPaid = isPaidTier(listing.planTier);
   <div class="flex flex-1 flex-col p-4">
     <p class="meta flex flex-wrap items-center gap-x-2">
       <span class="hue-fg font-bold">{listing.category}</span>
-      {listing.claimStatus === "claimed" && <span>&middot; Claimed</span>}
     </p>
 
     <h3 class="font-display mt-1.5 text-lg font-extrabold leading-tight tracking-tight">

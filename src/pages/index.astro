@@ -12,7 +12,8 @@ import { categoryHues } from "../lib/categories";
 import { getListings, getFeaturedListings, getListingsByCategory } from "../lib/directory";
 
 const listings = await getListings();
-const featured = await getFeaturedListings();
+const featured = (await getFeaturedListings()).slice(0, 15);
+const gems = listings.filter((l) => l.planTier === "free" && l.claimStatus !== "claimed").slice(0, 9);
 const byCategory = await getListingsByCategory();
 
 const categories = Object.entries(byCategory).sort((a, b) => b[1].length - a[1].length);
@@ -74,6 +75,31 @@ const channels = site.channels.filter((c) => c.url);
         <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {featured.map((listing, i) => <ListingCard listing={listing} index={i} />)}
         </div>
+
+        <a href="/listings" class="meta mt-6 inline-block font-bold text-signal hover:text-signal-sunk">
+          See the A-List &rarr;
+        </a>
+      </section>
+    )
+  }
+
+  {
+    gems.length > 0 && (
+      <section class="mx-auto max-w-6xl px-5 pb-12">
+        <div class="rule-capped pt-5">
+          <div class="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 class="font-display text-head">Find Local Gems</h2>
+            <span class="meta">Free listings, not yet claimed</span>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {gems.map((listing, i) => <ListingCard listing={listing} index={i} />)}
+        </div>
+
+        <a href="/listings" class="meta mt-6 inline-block font-bold text-signal hover:text-signal-sunk">
+          Discover all {listings.length} listings &rarr;
+        </a>
       </section>
     )
   }

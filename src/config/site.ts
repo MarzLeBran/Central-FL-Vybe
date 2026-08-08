@@ -170,9 +170,9 @@ export const site = {
     },
     {
       id: "featured",
-      name: "Spotlight",
+      name: "Just Vybin'",
       badge: "Best value",
-      price: "$250",
+      price: "$249",
       period: "per year",
       blurb: "Stand out from the crowd and turn views into real customers.",
       // Upgrading presupposes an already-claimed listing — checkout (Layer 4)
@@ -185,7 +185,7 @@ export const site = {
     },
     {
       id: "premium",
-      name: "All Access",
+      name: "Full Thrivin'",
       badge: "All in",
       price: "$699",
       period: "per year",
