@@ -113,16 +113,17 @@ export const site = {
 
   /**
    * Canonical origin, no trailing slash. Feeds canonical/og tags and the
-   * JSON-LD @id on every listing. Not registered yet — confirm the exact
-   * domain before launch, since changing it later moves every canonical URL.
+   * JSON-LD @id on every listing. This is the registered, connected domain —
+   * changing it later moves every canonical URL, so keep it in sync with
+   * whatever's actually wired up in Vercel.
    */
-  origin: "https://cflvybe.com",
+  origin: "https://centralflvybe.com",
 
   /** Shown in the footer. */
   established: 2026,
 
   /** Support address for claim questions. */
-  contactEmail: "hello@cflvybe.com",
+  contactEmail: "hello@centralflvybe.com",
 
   /**
    * Brand assets in `public/`. All were generated from the originals kept in
@@ -159,7 +160,7 @@ export const site = {
   plans: [
     {
       id: "free",
-      name: "Day Pass",
+      name: "Just Chillin'",
       badge: "On the house",
       price: "Free",
       period: "always",
@@ -205,7 +206,7 @@ export const site = {
    * Deliberately absent: "Google map on listing". The reference directory gates
    * it behind its mid tier, but the Maps Embed API is free with unlimited
    * requests, so gating it would withhold something that costs us nothing. Every
-   * listing gets a map; the Day Pass blurb says so. See docs/google-apis.md.
+   * listing gets a map; the Just Chillin' blurb says so. See docs/google-apis.md.
    */
   planFeatures: [
     { label: "Profile & cover image", free: true, featured: true, premium: true },
@@ -225,7 +226,6 @@ export const site = {
     { label: "Post jobs", free: false, featured: true, premium: true },
     { label: "Additional images", free: false, featured: true, premium: true },
     { label: "Extra links", free: false, featured: true, premium: true },
-    { label: "Embed custom code", free: false, featured: true, premium: true },
     { label: "YouTube video", free: false, featured: true, premium: true },
     { label: "Special offers", free: false, featured: true, premium: true },
     { label: "Online visibility report ($99 value)", free: false, featured: true, premium: true },

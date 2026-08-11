@@ -63,7 +63,9 @@ anything human-readable.
 | `booking_url` | Text | `bookingUrl` — curated safe embed (e.g. Calendly), validated as `https://` server-side before write |
 | `hours` | Multi-line | `hours` |
 | `social_links` | Multi-line | `socialLinks` (`instagram=https://…` per line) |
-| `plan_tier` | Dropdown: `Free` \| `Featured` \| `Premium` | `planTier` — Day Pass / Spotlight / All Access on `/pricing`; `normalizePlanTier()` also accepts "Spotlight"/"All Access" as synonyms. Upgraded automatically by Stripe checkout (Layer 4) once live. |
+| `extra_links` | Multi-line | `extraLinks` — owner-curated link list (`Label\|https://…` per line, one per line). Structured fields only, deliberately not a raw-HTML/embed field — see the "no custom code" note where `ListingEditForm.astro` is introduced. |
+| `special_offer` | Text | `specialOffer` — free-text coupon/promo blurb, owner-edited, shown as a banner on the listing page |
+| `plan_tier` | Dropdown: `Free` \| `Featured` \| `Premium` | `planTier` — Just Chillin' / Just Vybin' / Full Thrivin' on `/pricing`; `normalizePlanTier()` also accepts "Spotlight"/"All Access" as synonyms (the tier names before this round of renaming). Upgraded automatically by Stripe checkout (Layer 4) once live. |
 | `claim_status` | Dropdown: `Unclaimed` \| `Pending` \| `Claimed` | `claimStatus` |
 | `ai_context` | Multi-line | `aiContext` — knowledge for the All Access per-listing agent (Layer 5) |
 | `ai_agent_enabled` | Checkbox | `aiAgentEnabled` — Premium alone does NOT show the "Ask this business" card/widget; this must also be checked, by hand, once a real agent has actually been built for that specific business. Defaults unchecked/false on every listing, including new Premium ones. See `hasListingAgent()` in `src/types/listing.ts`. |
@@ -98,6 +100,8 @@ but nothing reads or writes it today:
 | `dir_claimed` | Claimed their listing — a hot lead. Added automatically by `submitClaim()` in `src/lib/submissions.ts`. |
 | `opt_in_voice` | Consented to AI-assisted calls (the `tcpaConsent` checkbox was checked on claim) — the outbound-call trigger. Added automatically by `submitClaim()`, only when consent was given. |
 | `dir_opt_out` | Suppress everything — respect this in every workflow's filter. |
+| `plan_featured` | Added automatically by `applyPlanUpgrade()` the moment a Stripe checkout for the Just Vybin' tier completes (live mode: from the Stripe webhook; mock mode: immediately). Removed automatically on a further upgrade to `plan_premium`. Exists so a GHL workflow can trigger off "Contact Tag Added" — see section 7 — rather than a broad "Contact Updated" firing on every unrelated edit. |
+| `plan_premium` | Same as `plan_featured`, for the Full Thrivin' tier. Mutually exclusive with `plan_featured` — `applyPlanUpgrade()` removes the other one when adding this one. |
 | `consumer` | **A visitor account, not a listing.** Set by `registerConsumer()` in `src/lib/consumer-submissions.ts` — deliberately never co-occurs with `business` on the same contact, even if the same person also owns a claimed listing under a different contact record. See `docs/consumer-accounts.md`. |
 
 ### Consumer-only custom fields (never used by `Listing`)
@@ -210,14 +214,21 @@ Hitting it with an empty POST kicks a fresh build — no payload, no auth
 beyond the URL itself, so treat the URL as a secret (anyone with it can
 trigger builds, though not read or write data).
 
-**GHL side** (dashboard, Workflows): build one workflow with two triggers —
+**GHL side** (dashboard, Workflows): build one workflow with triggers —
 "Contact Tag Added" and "Contact Tag Removed" — both scoped to the `business`
 tag specifically (not "Contact Updated" broadly, or unrelated CRM edits on
 every contact burn a build). Action: Webhook → POST to the Deploy Hook URL.
-If you also want field edits (e.g. correcting an address, changing
-`plan_tier` by hand) to go live without a manual redeploy, add a third
-trigger — "Contact Updated," filtered to contacts already tagged `business` —
-to the same workflow.
+
+**To also rebuild automatically when someone upgrades via Stripe:** add a
+third trigger — "Contact Tag Added," filtered to `plan_featured` **or**
+`plan_premium` (GHL lets you select multiple tags on one trigger; either one
+firing is enough) — to the same workflow, same webhook action. `applyPlanUpgrade()`
+in `src/lib/submissions.ts` adds one of those two tags the moment a real
+Stripe payment is confirmed (see section 3), so this is the same clean
+tag-triggered pattern as the `business` tag sync above, not a broad "Contact
+Updated" trigger that would also fire on unrelated edits like correcting a
+phone number. **Don't forget to hit Publish after adding it** — see gotcha #2
+below.
 
 A build takes ~1–2 minutes on Vercel, so there's a short lag between the GHL
 change and it going live — expected, not a bug.

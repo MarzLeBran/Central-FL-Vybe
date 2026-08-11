@@ -20,7 +20,7 @@ allowances Google introduced in March 2025 (10,000/month Essentials, 5,000 Pro,
 1,000 Enterprise).
 
 **Therefore the map is not a paid feature.** Every tier gets one, including the
-free Day Pass. The reference directory gates it behind its mid tier; that is
+free Just Chillin' tier. The reference directory gates it behind its mid tier; that is
 packaging, not economics, and copying it would withhold something that costs
 nothing to give away. Do not add a "Google map on listing" row to
 `site.planFeatures`.

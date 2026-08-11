@@ -10,12 +10,32 @@ interface Props {
   description: string;
   imageUrls: string[];
   logoUrl?: string;
+  address: string;
+  phone: string;
+  email?: string;
+  website?: string;
   youtubeUrl?: string;
   bookingUrl?: string;
   socialLinks?: Record<string, string>;
+  extraLinks?: { label: string; url: string }[];
+  specialOffer?: string;
 }
 
-const { listingId, description, imageUrls, logoUrl, youtubeUrl, bookingUrl, socialLinks = {} } = Astro.props;
+const {
+  listingId,
+  description,
+  imageUrls,
+  logoUrl,
+  address,
+  phone,
+  email,
+  website,
+  youtubeUrl,
+  bookingUrl,
+  socialLinks = {},
+  extraLinks = [],
+  specialOffer,
+} = Astro.props;
 
 const SOCIAL_NETWORKS: [string, string][] = [
   ["facebook", "Facebook"],
@@ -29,6 +49,54 @@ const SOCIAL_NETWORKS: [string, string][] = [
 
 <div data-edit-form data-listing-id={listingId} class="space-y-8">
   <div data-status class="hidden border-2 px-4 py-3 text-sm font-semibold"></div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <label for="address" class="meta mb-1.5 block">Address</label>
+      <input
+        id="address"
+        data-field="address"
+        type="text"
+        value={address}
+        required
+        class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+      />
+    </div>
+    <div>
+      <label for="phone" class="meta mb-1.5 block">Phone</label>
+      <input
+        id="phone"
+        data-field="phone"
+        type="tel"
+        value={phone}
+        required
+        class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+      />
+    </div>
+    <div>
+      <label for="email" class="meta mb-1.5 block">Email</label>
+      <input
+        id="email"
+        data-field="email"
+        type="email"
+        value={email ?? ""}
+        required
+        class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+      />
+      <p class="mt-1 text-xs text-ink-mute">This is also your sign-in email — changing it changes what you log in with.</p>
+    </div>
+    <div>
+      <label for="website" class="meta mb-1.5 block">Website (optional)</label>
+      <input
+        id="website"
+        data-field="website"
+        type="url"
+        value={website ?? ""}
+        placeholder="https://…"
+        class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+      />
+    </div>
+  </div>
 
   <div>
     <div class="mb-1.5 flex items-baseline justify-between">
@@ -112,6 +180,26 @@ const SOCIAL_NETWORKS: [string, string][] = [
     </div>
   </div>
 
+  <div>
+    <label for="specialOffer" class="meta mb-1.5 block">Special offer (optional)</label>
+    <input
+      id="specialOffer"
+      data-field="specialOffer"
+      type="text"
+      value={specialOffer ?? ""}
+      maxlength="300"
+      placeholder="e.g. 15% off first visit for new customers"
+      class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+    />
+  </div>
+
+  <div>
+    <p class="meta mb-1.5">Extra links (optional)</p>
+    <ul data-extra-links data-initial={JSON.stringify(extraLinks)} class="space-y-2"></ul>
+    <button type="button" data-add-link class="meta mt-2 font-bold hover:text-signal">+ Add a link</button>
+    <p class="mt-1 text-xs text-ink-mute">Up to 6 — a menu, a booking page, another location, anything with a URL.</p>
+  </div>
+
   <button type="button" data-save class="bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk">
     Save changes
   </button>
@@ -121,6 +209,9 @@ const SOCIAL_NETWORKS: [string, string][] = [
   type GalleryItem = { url: string };
 
   const sanitizeFilename = (name: string) => name.replace(/[^a-zA-Z0-9.\-]/g, "_");
+  // Values go into innerHTML as attribute content — escape the quote that
+  // would otherwise break out of the attribute (renderExtraLinks below).
+  const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
   document.querySelectorAll<HTMLElement>("[data-edit-form]").forEach((root) => {
     const listingId = root.dataset.listingId!;
@@ -136,10 +227,18 @@ const SOCIAL_NETWORKS: [string, string][] = [
     const logoPreview = root.querySelector<HTMLImageElement>("[data-logo-preview]")!;
     const galleryList = root.querySelector<HTMLUListElement>("[data-gallery]")!;
     const galleryInput = root.querySelector<HTMLInputElement>("[data-gallery-input]")!;
+    const addressField = root.querySelector<HTMLInputElement>('[data-field="address"]')!;
+    const phoneField = root.querySelector<HTMLInputElement>('[data-field="phone"]')!;
+    const emailField = root.querySelector<HTMLInputElement>('[data-field="email"]')!;
+    const websiteField = root.querySelector<HTMLInputElement>('[data-field="website"]')!;
+    const specialOfferField = root.querySelector<HTMLInputElement>('[data-field="specialOffer"]')!;
+    const extraLinksList = root.querySelector<HTMLUListElement>("[data-extra-links]")!;
+    const addLinkBtn = root.querySelector<HTMLButtonElement>("[data-add-link]")!;
     const saveBtn = root.querySelector<HTMLButtonElement>("[data-save]")!;
 
     let gallery: GalleryItem[] = JSON.parse(galleryList.dataset.initial || "[]");
     let dragFrom: number | null = null;
+    let extraLinks: { label: string; url: string }[] = JSON.parse(extraLinksList.dataset.initial || "[]");
 
     const showStatus = (message: string, kind: "ok" | "error") => {
       status.textContent = message;
@@ -208,6 +307,42 @@ const SOCIAL_NETWORKS: [string, string][] = [
       gallery.splice(to, 0, item);
       dragFrom = null;
       renderGallery();
+    });
+
+    const renderExtraLinks = () => {
+      extraLinksList.innerHTML = extraLinks
+        .map(
+          (link, i) => `
+        <li data-i="${i}" class="flex gap-2">
+          <input data-link-label value="${escapeAttr(link.label)}" placeholder="Label" class="w-1/3 border-2 border-rule bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none" />
+          <input data-link-url value="${escapeAttr(link.url)}" placeholder="https://…" class="flex-1 border-2 border-rule bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none" />
+          <button type="button" data-remove-link aria-label="Remove link" class="px-2 text-ink-mute hover:text-signal">&times;</button>
+        </li>`
+        )
+        .join("");
+    };
+
+    extraLinksList.addEventListener("input", (e) => {
+      const li = (e.target as HTMLElement).closest<HTMLLIElement>("li[data-i]");
+      if (!li) return;
+      const i = Number(li.dataset.i);
+      const label = li.querySelector<HTMLInputElement>("[data-link-label]")!.value;
+      const url = li.querySelector<HTMLInputElement>("[data-link-url]")!.value;
+      extraLinks[i] = { label, url };
+    });
+
+    extraLinksList.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-remove-link]");
+      if (!btn) return;
+      const li = btn.closest<HTMLLIElement>("li[data-i]")!;
+      extraLinks.splice(Number(li.dataset.i), 1);
+      renderExtraLinks();
+    });
+
+    addLinkBtn.addEventListener("click", () => {
+      if (extraLinks.length >= 6) return;
+      extraLinks.push({ label: "", url: "" });
+      renderExtraLinks();
     });
 
     async function uploadOne(file: File): Promise<string> {
@@ -300,6 +435,10 @@ const SOCIAL_NETWORKS: [string, string][] = [
             description: description.value,
             imageUrls: gallery.map((g) => g.url),
             logoUrl: logoField.value || undefined,
+            address: addressField.value,
+            phone: phoneField.value,
+            email: emailField.value,
+            website: websiteField.value || undefined,
             youtubeUrl: youtubeUrl.value || undefined,
             bookingUrl: bookingUrl.value || undefined,
             socialLinks: Object.fromEntries(
@@ -307,6 +446,8 @@ const SOCIAL_NETWORKS: [string, string][] = [
                 .map((el) => [el.dataset.socialField!, el.value.trim()])
                 .filter(([, url]) => url)
             ),
+            extraLinks: extraLinks.filter((l) => l.label.trim() && l.url.trim()),
+            specialOffer: specialOfferField.value || undefined,
           }),
         });
         const result = await res.json();
@@ -321,5 +462,6 @@ const SOCIAL_NETWORKS: [string, string][] = [
     });
 
     renderGallery();
+    renderExtraLinks();
   });
 </script>

@@ -53,6 +53,9 @@ export interface Listing {
   logoUrl?: string;           // logo_url — owner-uploaded, separate from imageUrls[0]/cover
   youtubeUrl?: string;        // youtube_url — curated safe embed, validated at write time
   bookingUrl?: string;        // booking_url — curated safe embed (e.g. Calendly), validated at write time
+  extraLinks?: { label: string; url: string }[]; // extra_links — owner-curated link list (structured
+                              // fields, not raw HTML/embeds — see the "no custom code" note in AGENTS.md)
+  specialOffer?: string;      // special_offer — free-text coupon/promo blurb, owner-edited
 
   planTier: PlanTier;         // plan_tier  -> drives Featured styling + which chat widget
   claimStatus: ClaimStatus;   // claim_status

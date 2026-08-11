@@ -51,7 +51,7 @@ directory, not a separate deploy — see the county/category note below).
   directory with county × category browse pages — not seven separate builds.
 
 THE TIERS (drives everything — names/prices live in src/config/site.ts)
-- Free ("Day Pass"), $0 forever: a REAL, complete listing — description,
+- Free ("Just Chillin'"), $0 forever: a REAL, complete listing — description,
   hours, phone, website, socials, map, structured data, claim button. Never
   crippled to force an upgrade — that's a hard rule, not a suggestion.
 - Featured ("Spotlight"), $250/yr: + Google reviews & map polish, gallery,

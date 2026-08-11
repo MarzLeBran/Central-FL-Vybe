@@ -23,7 +23,7 @@ export interface CheckoutInput {
   listingId: string;
   plan: UpgradeTier;
   businessName: string;
-  origin: string; // e.g. "https://cflvybe.com" or "http://localhost:4322"
+  origin: string; // e.g. "https://centralflvybe.com" or "http://localhost:4322"
 }
 
 /**

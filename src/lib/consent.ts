@@ -9,11 +9,10 @@
 // changes below — that string is what tcpa_consent_version proves in a dispute,
 // so a silent wording edit with no version bump defeats the point of recording it.
 
-export const TCPA_CONSENT_VERSION = "2026-08-v1";
+export const TCPA_CONSENT_VERSION = "2026-08-v2";
 
 export const TCPA_CONSENT_TEXT =
-  "I consent to receive marketing and informational text messages and " +
-  "automated or prerecorded voice calls (including AI-assisted calls) from " +
-  "this business. Consent is not a condition of purchase. Message frequency " +
-  "varies. Message and data rates may apply. Text STOP to unsubscribe from " +
-  "text messages at any time.";
+  "I consent to receive AI-assisted calls and SMS text messages, including " +
+  "marketing and informational messages, from this business. Consent is not " +
+  "a condition of purchase. Message frequency varies. Message and data rates " +
+  "may apply. Text DELETE to unsubscribe from text messages at any time.";

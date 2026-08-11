@@ -153,6 +153,15 @@ if (listing.rating && listing.reviewCount) {
       }
     </div>
 
+    {
+      listing.specialOffer && (
+        <div class="hue-block mt-6 flex items-center gap-3 border-2 border-rule px-4 py-3">
+          <span class="text-xl" aria-hidden="true">&#127903;</span>
+          <p class="text-sm font-bold">{listing.specialOffer}</p>
+        </div>
+      )
+    }
+
     <div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
       {/* Main column: photos, then the long-form description. */}
       <div class="lg:col-span-2">
@@ -263,6 +272,20 @@ if (listing.rating && listing.reviewCount) {
                   <SocialIcon network={network} href={url} />
                 ))}
               </div>
+            )
+          }
+
+          {
+            listing.extraLinks && listing.extraLinks.length > 0 && (
+              <ul class="mt-4 space-y-1.5 border-t-2 border-rule pt-4 text-sm">
+                {listing.extraLinks.map((link) => (
+                  <li>
+                    <a href={link.url} target="_blank" rel="nofollow noopener" class="hue-fg font-bold">
+                      {link.label} &rarr;
+                    </a>
+                  </li>
+                ))}
+              </ul>
             )
           }
 

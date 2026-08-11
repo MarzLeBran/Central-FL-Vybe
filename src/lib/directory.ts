@@ -165,6 +165,8 @@ function mapContactToListing(c: any, keyMap: Map<string, string>): Listing {
     logoUrl: cf("logo_url") || undefined,
     youtubeUrl: cf("youtube_url") || undefined,
     bookingUrl: cf("booking_url") || undefined,
+    extraLinks: parseExtraLinks(cf("extra_links")),
+    specialOffer: cf("special_offer") || undefined,
     planTier: normalizePlanTier(cf("plan_tier")),
     claimStatus: (cf("claim_status") ?? "unclaimed").toLowerCase() as Listing["claimStatus"],
     email: c.email || undefined,
@@ -210,6 +212,31 @@ export function serializeSocialLinks(links: Record<string, string> | undefined):
   return Object.entries(links ?? {})
     .filter(([, url]) => url)
     .map(([network, url]) => `${network}=${url}`)
+    .join("\n");
+}
+
+// extra_links is the same one-per-line convention as social_links, but the
+// left side is an owner-chosen label rather than a fixed network name, so it
+// uses "|" (never legal in a label) instead of "=" (legal in a query string).
+function parseExtraLinks(v: any): { label: string; url: string }[] | undefined {
+  if (Array.isArray(v)) return v; // already structured (mock data)
+  const lines = String(v ?? "").split(/\r?\n/);
+  const out: { label: string; url: string }[] = [];
+  for (const line of lines) {
+    const i = line.indexOf("|");
+    if (i < 1) continue;
+    const label = line.slice(0, i).trim();
+    const url = line.slice(i + 1).trim();
+    if (label && url) out.push({ label, url });
+  }
+  return out.length ? out : undefined;
+}
+
+/** Inverse of parseExtraLinks — used by submissions.ts. */
+export function serializeExtraLinks(links: { label: string; url: string }[] | undefined): string {
+  return (links ?? [])
+    .filter((l) => l.label && l.url)
+    .map((l) => `${l.label}|${l.url}`)
     .join("\n");
 }
 

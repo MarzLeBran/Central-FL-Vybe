@@ -180,6 +180,15 @@ Tom's own best advice, stripped of the sales: *get live fast, prospect, then bui
 
 ---
 
+## 6b. Editing a live listing (the "admin panel" question)
+
+There's no separate admin app (that's Tom's $72k custom piece — we don't need it). Instead:
+
+- **The GHL contact record IS the admin UI.** Every listing field (description, category, hours, `plan_tier`, `image_urls`) is a custom field on that contact. To edit copy, open the contact in GHL and edit the field. To mark someone Featured, flip `plan_tier` from Free to Featured. To add photos, upload to GHL's Media Library (Sites → Media) and paste the resulting URL(s) into `image_urls`.
+- **The rebuild-trigger problem (real, must build):** our site is static (great for SEO/speed), so a GHL field change doesn't appear until the site rebuilds. Solve with a GHL workflow: trigger = any `business`-tagged contact updated → action = webhook to the site's **Vercel Deploy Hook URL**. This kicks a fresh build (~1–2 min) and the edit goes live automatically — no manual redeploys, no code touching.
+- **Belongs to:** Layer 2 (build the deploy hook + GHL workflow alongside the claim workflow — same "GHL write → site updates" pattern).
+- **v2 option (optional, not needed for launch):** once managing dozens of listings by hand in raw GHL fields feels slow, a small custom internal admin page (Claude Code, calling the same GHL API) can give a nicer editing UI — image upload, live preview, etc. This is an internal tool for you/your team, not an owner-facing dashboard (that's the different, deferred Layer 6 feature). Build only if the raw-GHL-field workflow starts to hurt.
+
 ## 7. First move (this week)
 
 1. **Layer 0** in GHL — sub-account, fields, tags, API token. (A couple hours, mostly manual + Ask AI.)

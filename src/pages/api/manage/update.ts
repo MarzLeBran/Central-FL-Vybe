@@ -13,12 +13,15 @@ import { verifySession, isSameOrigin, SESSION_COOKIE } from "../../../lib/auth";
 import { renderDescriptionHtml } from "../../../lib/markdown";
 
 const YOUTUBE_RE = /^https:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SOCIAL_NETWORKS = ["facebook", "instagram", "x", "linkedin", "tiktok", "youtube"];
 // 10,000 chars comfortably fits a full AEO-style long-form description (a
 // real example ran ~4,300 chars / 590 words) with headroom to spare. Not
 // based on any confirmed GHL field limit — just a sane upper bound against
 // someone pasting something absurd, raised from an earlier arbitrary 2,000.
 const DESCRIPTION_MAX = 10000;
+const OFFER_MAX = 300;
+const EXTRA_LINKS_MAX = 6;
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   if (!isSameOrigin(request)) {
@@ -63,6 +66,39 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json({ ok: false, error: "description could not be rendered — check formatting" }, 400);
   }
 
+  const address = String(body.address ?? "").trim();
+  if (!address) return json({ ok: false, error: "address is required" }, 400);
+
+  const phone = String(body.phone ?? "").trim();
+  if (!phone) return json({ ok: false, error: "phone is required" }, 400);
+
+  const email = String(body.email ?? "").trim();
+  if (!EMAIL_RE.test(email)) return json({ ok: false, error: "a valid email is required" }, 400);
+
+  const website = body.website ? String(body.website).trim() : undefined;
+  if (website && !/^https?:\/\//.test(website)) {
+    return json({ ok: false, error: "website must start with http:// or https://" }, 400);
+  }
+
+  const specialOffer = body.specialOffer ? String(body.specialOffer).trim() : undefined;
+  if (specialOffer && specialOffer.length > OFFER_MAX) {
+    return json({ ok: false, error: `special offer must be under ${OFFER_MAX} characters` }, 400);
+  }
+
+  const extraLinksRaw = Array.isArray(body.extraLinks) ? body.extraLinks : [];
+  if (extraLinksRaw.length > EXTRA_LINKS_MAX) {
+    return json({ ok: false, error: `no more than ${EXTRA_LINKS_MAX} extra links` }, 400);
+  }
+  const extraLinks: { label: string; url: string }[] = [];
+  for (const entry of extraLinksRaw) {
+    const label = String(entry?.label ?? "").trim();
+    const url = String(entry?.url ?? "").trim();
+    if (!label && !url) continue;
+    if (!label || !url) return json({ ok: false, error: "extra links need both a label and a url" }, 400);
+    if (!/^https?:\/\//.test(url)) return json({ ok: false, error: `extra link "${label}" must be http:// or https://` }, 400);
+    extraLinks.push({ label, url });
+  }
+
   const imageUrls = Array.isArray(body.imageUrls) ? body.imageUrls.map(String) : [];
   const logoUrl = body.logoUrl ? String(body.logoUrl) : undefined;
   for (const url of logoUrl ? [...imageUrls, logoUrl] : imageUrls) {
@@ -96,9 +132,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     description,
     imageUrls,
     logoUrl,
+    address,
+    phone,
+    email,
+    website,
     youtubeUrl,
     bookingUrl,
     socialLinks,
+    extraLinks,
+    specialOffer,
   });
   if (!result.ok) return json(result, 500);
 
