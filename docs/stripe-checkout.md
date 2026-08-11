@@ -1,6 +1,6 @@
 # Stripe checkout — Layer 4
 
-Sells the two paid directory plans (Just Vybin' $249/yr, Full Thrivin' $699/yr).
+Sells the two paid directory plans (Good Vybin' $249/yr, Full Thrivin' $699/yr).
 **Never the GHL agency retainer** — that stays a post-claim conversation, off
 `/pricing` and off this checkout, per the golden rule in `AGENTS.md`.
 
@@ -18,7 +18,7 @@ Sells the two paid directory plans (Just Vybin' $249/yr, Full Thrivin' $699/yr).
    [`src/lib/submissions.ts`](../src/lib/submissions.ts) — same `plan_tier`
    custom field Layer 0 already defines.
 
-`/pricing`'s Just Vybin'/Full Thrivin' buttons still point at `/listings`
+`/pricing`'s Good Vybin'/Full Thrivin' buttons still point at `/listings`
 ("Find your listing"), not at `/upgrade` directly — there's no listing in
 scope on that page, and upgrading presupposes an already-claimed one.
 
@@ -36,7 +36,7 @@ Set in `.env`:
 
 ```
 STRIPE_SECRET_KEY=sk_...
-STRIPE_PRICE_FEATURED=price_...   # $249/yr Just Vybin' price id
+STRIPE_PRICE_FEATURED=price_...   # $249/yr Good Vybin' price id
 STRIPE_PRICE_PREMIUM=price_...    # $699/yr Full Thrivin' price id
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```

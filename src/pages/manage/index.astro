@@ -19,7 +19,9 @@ if (!session || session.kind !== "owner") {
 }
 
 const listing = await getListingById(session.contactId);
-const eligible = !!listing && listing.claimStatus === "claimed" && listing.planTier !== "free";
+// "pending" counts too, not just "claimed" — see the matching comment in
+// api/manage/request-link.ts.
+const eligible = !!listing && listing.claimStatus !== "unclaimed" && listing.planTier !== "free";
 if (!listing || !eligible) {
   Astro.cookies.delete(SESSION_COOKIE, { path: "/" });
   return Astro.redirect("/manage/login?error=ineligible");

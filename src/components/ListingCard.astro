@@ -28,7 +28,12 @@ const hue = await hueClass(listing.category);
 // than only on /pricing.
 const plan = site.plans.find((p) => p.id === listing.planTier);
 const isPaid = isPaidTier(listing.planTier);
-const isClaimed = listing.claimStatus === "claimed";
+// "pending" reads as claimed here too — a self-signup (free or paid, via
+// /add-business) already has an owner attached the moment it's submitted;
+// "pending" just means you haven't personally confirmed it yet. Showing
+// "Claim It" on a listing someone already gave you their info for would be
+// actively confusing, not just imprecise.
+const isClaimed = listing.claimStatus !== "unclaimed";
 ---
 
 <div

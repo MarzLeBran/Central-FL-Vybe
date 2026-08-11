@@ -20,6 +20,9 @@ import { getListingsByCategory } from "../lib/directory";
 const known = new Set(Object.keys(await getListingsByCategory()));
 site.categoryGroups.flatMap((g) => g.categories).forEach((c) => known.add(c));
 const categories = [...known].sort();
+
+const requestedPlan = Astro.url.searchParams.get("plan");
+const initialPlan = ["free", "featured", "premium"].includes(requestedPlan ?? "") ? requestedPlan : "free";
 ---
 
 <BaseLayout
@@ -31,7 +34,8 @@ const categories = [...known].sort();
       <h1 class="font-display text-head">Add your business</h1>
     </div>
     <p class="mt-4 max-w-md text-sub text-ink-soft">
-      Free, and it stays free. We'll review your submission and it'll be live shortly.
+      Free and it stays free — or pay now and go live immediately on Good Vybin' or Full
+      Thrivin'. Either way it's live right away, with a quick human check-in after.
     </p>
 
     <p
@@ -50,6 +54,33 @@ const categories = [...known].sort();
         aria-hidden="true"
         class="absolute -left-[9999px] h-0 w-0 opacity-0"
       />
+
+      <div>
+        <p class="meta mb-1.5">Choose a plan</p>
+        <div class="grid gap-3 sm:grid-cols-3" data-plan-picker>
+          {site.plans.map((plan) => (
+            <label
+              class:list={[
+                `hue-${plan.hue}`,
+                "lift flex cursor-pointer flex-col gap-1 border-2 border-rule p-3.5 has-[:checked]:border-[var(--h)] has-[:checked]:ring-2 has-[:checked]:ring-[var(--h)]",
+              ]}
+            >
+              <input
+                type="radio"
+                name="plan"
+                value={plan.id}
+                checked={plan.id === initialPlan}
+                class="sr-only"
+                data-plan-radio
+              />
+              <span class="font-display font-extrabold">{plan.name}</span>
+              <span class="meta hue-fg font-bold">
+                {plan.price}{plan.id !== "free" && <span class="font-normal"> /yr</span>}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
 
       <div>
         <label for="businessName" class="meta mb-1.5 block">Business name</label>
@@ -172,13 +203,29 @@ const categories = [...known].sort();
 
       <button
         type="submit"
+        data-submit-btn
         class="w-full bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk"
       >
-        Submit for review &rarr;
+        {initialPlan === "free" ? "Add my free listing" : "Continue to payment"} &rarr;
       </button>
     </form>
   </section>
 </BaseLayout>
+
+<script define:vars={{ plans: [
+  { id: "free", label: "Add my free listing" },
+  { id: "featured", label: "Continue to payment" },
+  { id: "premium", label: "Continue to payment" },
+] }}>
+  const radios = document.querySelectorAll("[data-plan-radio]");
+  const submitBtn = document.querySelector("[data-submit-btn]");
+  radios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      const match = plans.find((p) => p.id === radio.value);
+      if (match && submitBtn) submitBtn.textContent = `${match.label} →`;
+    });
+  });
+</script>
 
 <script>
   const ERRORS: Record<string, string> = {

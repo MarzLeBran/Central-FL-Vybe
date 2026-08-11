@@ -24,19 +24,27 @@ export interface CheckoutInput {
   plan: UpgradeTier;
   businessName: string;
   origin: string; // e.g. "https://centralflvybe.com" or "http://localhost:4322"
+  // True for a brand-new paid signup from /add-business, where the contact
+  // exists in GHL but isn't tagged `business` yet — payment is what makes it
+  // go live (see submitAddBusiness()/applyPlanUpgrade() in submissions.ts).
+  // False/omitted for the normal case: upgrading an already-live listing.
+  activate?: boolean;
 }
 
 /**
- * Starts an upgrade. Mock mode applies it immediately (nothing to wait on);
- * live mode creates a real Stripe Checkout Session and returns its hosted URL.
- * `/api/checkout` redirects the browser to whatever URL comes back.
+ * Starts an upgrade (or a paid signup, if `activate` is set). Mock mode
+ * applies it immediately (nothing to wait on); live mode creates a real
+ * Stripe Checkout Session and returns its hosted URL. The caller redirects
+ * the browser to whatever URL comes back.
  */
 export async function createCheckoutSession(input: CheckoutInput): Promise<Result> {
   const secretKey = requireEnv("STRIPE_SECRET_KEY");
-  const thanksUrl = `${input.origin}/upgrade/thanks?business=${encodeURIComponent(input.businessName)}&plan=${input.plan}`;
+  const thanksUrl = input.activate
+    ? `${input.origin}/add-business/thanks?business=${encodeURIComponent(input.businessName)}&plan=${input.plan}`
+    : `${input.origin}/upgrade/thanks?business=${encodeURIComponent(input.businessName)}&plan=${input.plan}`;
 
   if (!secretKey) {
-    const result = await applyPlanUpgrade({ listingId: input.listingId, plan: input.plan });
+    const result = await applyPlanUpgrade({ listingId: input.listingId, plan: input.plan, activate: input.activate });
     if (!result.ok) return result;
     return { ok: true, url: thanksUrl };
   }
@@ -46,7 +54,9 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Resul
   );
   if (!priceId) return { ok: false, error: `Stripe price id for "${input.plan}" is not set` };
 
-  const cancelUrl = `${input.origin}/upgrade?t=${encodeURIComponent(input.listingId)}&plan=${input.plan}&error=cancelled`;
+  const cancelUrl = input.activate
+    ? `${input.origin}/add-business?plan=${input.plan}&error=cancelled`
+    : `${input.origin}/upgrade?t=${encodeURIComponent(input.listingId)}&plan=${input.plan}&error=cancelled`;
 
   // Annual plans billed as one-time charges, not subscriptions — GHL workflows
   // (Layer 3) own renewal reminders rather than Stripe auto-renewing a listing
@@ -65,6 +75,7 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Resul
       cancel_url: cancelUrl,
       "metadata[listingId]": input.listingId,
       "metadata[plan]": input.plan,
+      "metadata[activate]": input.activate ? "1" : "0",
     }),
   });
 

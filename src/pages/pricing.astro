@@ -60,6 +60,16 @@ const has = (row: (typeof site.planFeatures)[number], id: TierId) => row[id];
               >
                 {tier.cta.label}
               </a>
+              {
+                tier.id !== "free" && (
+                  <a
+                    href={`/add-business?plan=${tier.id}`}
+                    class="meta mt-3 block text-center font-bold text-signal hover:text-signal-sunk"
+                  >
+                    New business? List &amp; pay now &rarr;
+                  </a>
+                )
+              }
             </div>
 
             <ul class="flex-1 divide-y divide-rule px-5">
@@ -99,7 +109,7 @@ const has = (row: (typeof site.planFeatures)[number], id: TierId) => row[id];
           ever. Claim yours, see what it does for you, and upgrade only if it earns it.
         </p>
         <p class="meta mt-6 opacity-70">
-          Upgrading to Just Vybin' or Full Thrivin' happens from your own listing page,
+          Upgrading to Good Vybin' or Full Thrivin' happens from your own listing page,
           once it's claimed.
         </p>
       </div>

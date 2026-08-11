@@ -21,7 +21,10 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   if (!email) return redirect("/manage/login?sent=1");
 
   const listing = await getListingByEmail(email);
-  const eligible = listing && listing.claimStatus === "claimed" && listing.planTier !== "free";
+  // "pending" counts too, not just "claimed" — a paid /add-business signup
+  // is Pending (awaiting your human follow-up) but already paying, so they
+  // get self-serve access right away rather than waiting on manual review.
+  const eligible = listing && listing.claimStatus !== "unclaimed" && listing.planTier !== "free";
 
   if (eligible) {
     const token = createMagicLinkToken(listing.id, "owner");

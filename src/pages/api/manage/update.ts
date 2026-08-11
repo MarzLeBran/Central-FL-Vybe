@@ -46,7 +46,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // change mid-session (downgrade, unclaim) and this is the actual mutation.
   if (session.kind === "owner") {
     const isPaid = listing.planTier !== "free";
-    if (listing.claimStatus !== "claimed" || !isPaid) {
+    if (listing.claimStatus === "unclaimed" || !isPaid) {
       return json({ ok: false, error: "listing is no longer eligible" }, 403);
     }
   }

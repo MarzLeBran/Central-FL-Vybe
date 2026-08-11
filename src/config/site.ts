@@ -171,7 +171,7 @@ export const site = {
     },
     {
       id: "featured",
-      name: "Just Vybin'",
+      name: "Good Vybin'",
       badge: "Best value",
       price: "$249",
       period: "per year",

@@ -38,8 +38,9 @@ export const POST: APIRoute = async ({ request }) => {
     const session = event.data?.object ?? {};
     const listingId = session.metadata?.listingId;
     const plan = session.metadata?.plan;
+    const activate = session.metadata?.activate === "1";
     if (listingId && (plan === "featured" || plan === "premium")) {
-      await applyPlanUpgrade({ listingId, plan });
+      await applyPlanUpgrade({ listingId, plan, activate });
     }
   }
 

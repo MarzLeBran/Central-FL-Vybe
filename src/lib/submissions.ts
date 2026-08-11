@@ -41,7 +41,10 @@ export interface AddBusinessInput extends ConsentMeta {
   description?: string;
   ownerName?: string;
   socialLinks?: Record<string, string>;
+  plan: "free" | "featured" | "premium";
 }
+
+type AddBusinessResult = { ok: true; contactId: string } | { ok: false; error: string };
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -89,23 +92,36 @@ export async function submitClaim(input: ClaimInput): Promise<Result> {
 }
 
 /**
- * A visitor submitting a business that isn't listed yet. Creates a NEW contact
- * WITHOUT the `business` tag — see "new_business_request" in docs/ghl-layer-0.md.
- * It stays invisible on the live directory until an admin reviews it in GHL and
- * adds `business` themselves. That review gate is the whole point of this
- * function not just tagging it live immediately.
+ * A visitor submitting a business that isn't listed yet — any of the three
+ * tiers. Creates a NEW contact with `claim_status: Pending` always (a human
+ * still needs to follow up either way), but the `business` tag — the one
+ * that actually makes it live — depends on the tier:
+ *
+ *   - free: tagged `business` immediately, right here. Live the moment this
+ *     function returns.
+ *   - featured/premium: created WITHOUT the tag. `/api/add-business` sends
+ *     the visitor to Stripe next; the tag only gets added by
+ *     `applyPlanUpgrade({ activate: true })` once the webhook confirms real
+ *     payment, so nobody pays and then finds out it never went live, and
+ *     nobody sees a paid listing that was never actually paid for.
+ *
+ * Returns the new contact id so the caller can hand it to Stripe as the
+ * checkout session's listingId metadata for a paid signup.
  */
-export async function submitAddBusiness(input: AddBusinessInput): Promise<Result> {
+export async function submitAddBusiness(input: AddBusinessInput): Promise<AddBusinessResult> {
   const submittedAt = new Date().toISOString();
 
   if (DATA_SOURCE !== "ghl") {
-    logDev("add-business", { ...input, submittedAt });
-    return { ok: true };
+    const contactId = `mock-${Date.now()}`;
+    logDev("add-business", { ...input, contactId, submittedAt });
+    return { ok: true, contactId };
   }
 
   const token = requireEnv("GHL_PIT_TOKEN");
   const locationId = requireEnv("GHL_LOCATION_ID");
   if (!token || !locationId) return { ok: false, error: "GHL env vars are not set" };
+
+  const planLabel = input.plan === "premium" ? "Premium" : input.plan === "featured" ? "Featured" : "Free";
 
   // NOTE: verified against the documented Update Contact body shape (which the
   // GHL docs confirm accepts `key`-addressed customFields). The Create Contact
@@ -125,7 +141,7 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<Result
       email: input.email,
       phone: input.phone,
       website: input.website || undefined,
-      tags: ["new_business_request"],
+      tags: input.plan === "free" ? ["business"] : [],
       customFields: [
         { key: "business_name", fieldValue: input.businessName },
         { key: "business_category", fieldValue: input.category },
@@ -133,7 +149,7 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<Result
         { key: "scraped_address", fieldValue: input.address },
         { key: "scraped_phone", fieldValue: input.phone },
         { key: "listing_slug", fieldValue: slugify(input.businessName) },
-        { key: "plan_tier", fieldValue: "Free" },
+        { key: "plan_tier", fieldValue: planLabel },
         { key: "claim_status", fieldValue: "Pending" },
         { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
         ...consentFields(input, submittedAt),
@@ -142,7 +158,18 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<Result
   });
 
   if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
-  return { ok: true };
+
+  // UNVERIFIED, flagged honestly (same caveat as the request body above): the
+  // Create Contact response shape wasn't checked against a live call. GHL
+  // typically wraps the created record as `{ contact: { id, ... } }` — falls
+  // back to a bare `id` in case it doesn't. Confirm on your first real paid
+  // signup; if this is wrong, the checkout session below gets created with a
+  // garbage listingId and the webhook silently can't find the contact.
+  const data = await res.json().catch(() => ({}));
+  const contactId = data.contact?.id ?? data.id;
+  if (!contactId) return { ok: false, error: "GHL create succeeded but returned no contact id" };
+
+  return { ok: true, contactId };
 }
 
 /**
@@ -157,10 +184,17 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<Result
  * on upgrade, the same narrow pattern the `business` tag sync already uses
  * (see "Keeping the live site in sync" in docs/ghl-layer-0.md), rather than a
  * broad "Contact Updated" trigger firing on every unrelated edit.
+ *
+ * `activate: true` additionally adds the `business` tag itself — used when
+ * this is a brand-new paid signup from `/add-business` (see
+ * `submitAddBusiness()`) rather than an upgrade of an already-live listing,
+ * so the listing only actually appears on the site once payment is confirmed,
+ * never before.
  */
 export async function applyPlanUpgrade(input: {
   listingId: string;
   plan: "featured" | "premium";
+  activate?: boolean;
 }): Promise<Result> {
   if (DATA_SOURCE !== "ghl") {
     logDev("upgrade", input);
@@ -185,11 +219,12 @@ export async function applyPlanUpgrade(input: {
   // reads, so a tag hiccup here must never fail the upgrade itself. Removes
   // the sibling tier's tag too, so a featured -> premium upgrade doesn't
   // leave both tags on the contact.
-  const addTag = input.plan === "premium" ? "plan_premium" : "plan_featured";
-  const removeTag = input.plan === "premium" ? "plan_featured" : "plan_premium";
+  const tagsToAdd = input.plan === "premium" ? ["plan_premium"] : ["plan_featured"];
+  if (input.activate) tagsToAdd.push("business");
+  const tagToRemove = input.plan === "premium" ? "plan_featured" : "plan_premium";
   await Promise.allSettled([
-    addTags(input.listingId, [addTag], token),
-    removeTags(input.listingId, [removeTag], token),
+    addTags(input.listingId, tagsToAdd, token),
+    removeTags(input.listingId, [tagToRemove], token),
   ]);
 
   return { ok: true };

@@ -125,7 +125,7 @@ if (listing.rating && listing.reviewCount) {
       <p class="meta flex flex-wrap items-center gap-2">
         <span class="hue-fg font-bold">{listing.category}</span>
         {isPaid && plan && <span class="hue-block chip">&#9733; {plan.name}</span>}
-        {listing.claimStatus === "claimed" && <span>&middot; Claimed by owner</span>}
+        {listing.claimStatus !== "unclaimed" && <span>&middot; Claimed by owner</span>}
       </p>
       <h1 class="font-display mt-3 text-mast">{listing.businessName}</h1>
       <p class="mt-2 text-sm text-ink-soft">
@@ -291,7 +291,7 @@ if (listing.rating && listing.reviewCount) {
 
           <div class="mt-4 border-t-2 border-rule pt-4 text-sm">
             {
-              listing.claimStatus === "claimed" ? (
+              listing.claimStatus !== "unclaimed" ? (
                 <span class="hue-block chip">Claimed</span>
               ) : (
                 <a href={`/claim?t=${listing.id}`} class="hue-fg font-bold">
@@ -335,7 +335,7 @@ if (listing.rating && listing.reviewCount) {
     }
 
     {
-      listing.claimStatus === "claimed" && nextPlan && (
+      listing.claimStatus !== "unclaimed" && nextPlan && (
         <div class="mt-10">
           <div class:list={[`hue-${nextPlan.hue}`, "hue-block px-6 py-8"]}>
             <p class="meta font-bold">Own this listing? Do more with {nextPlan.name}</p>

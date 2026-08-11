@@ -65,7 +65,7 @@ anything human-readable.
 | `social_links` | Multi-line | `socialLinks` (`instagram=https://…` per line) |
 | `extra_links` | Multi-line | `extraLinks` — owner-curated link list (`Label\|https://…` per line, one per line). Structured fields only, deliberately not a raw-HTML/embed field — see the "no custom code" note where `ListingEditForm.astro` is introduced. |
 | `special_offer` | Text | `specialOffer` — free-text coupon/promo blurb, owner-edited, shown as a banner on the listing page |
-| `plan_tier` | Dropdown: `Free` \| `Featured` \| `Premium` | `planTier` — Just Chillin' / Just Vybin' / Full Thrivin' on `/pricing`; `normalizePlanTier()` also accepts "Spotlight"/"All Access" as synonyms (the tier names before this round of renaming). Upgraded automatically by Stripe checkout (Layer 4) once live. |
+| `plan_tier` | Dropdown: `Free` \| `Featured` \| `Premium` | `planTier` — Just Chillin' / Good Vybin' / Full Thrivin' on `/pricing`; `normalizePlanTier()` also accepts "Spotlight"/"All Access" as synonyms (the tier names before this round of renaming). Upgraded automatically by Stripe checkout (Layer 4) once live. |
 | `claim_status` | Dropdown: `Unclaimed` \| `Pending` \| `Claimed` | `claimStatus` |
 | `ai_context` | Multi-line | `aiContext` — knowledge for the All Access per-listing agent (Layer 5) |
 | `ai_agent_enabled` | Checkbox | `aiAgentEnabled` — Premium alone does NOT show the "Ask this business" card/widget; this must also be checked, by hand, once a real agent has actually been built for that specific business. Defaults unchecked/false on every listing, including new Premium ones. See `hasListingAgent()` in `src/types/listing.ts`. |
@@ -94,13 +94,13 @@ but nothing reads or writes it today:
 | Tag | Meaning |
 |---|---|
 | `business` | **Makes the contact a listing.** Remove it and the listing disappears from the live site — but only after the next build; see section 7 for making that automatic. |
-| `new_business_request` | Self-submitted via `/add-business`, **not yet a live listing**. Review in GHL and add `business` yourself to publish it. |
+| `new_business_request` | **Legacy — not used by the current `/add-business` flow.** Previously meant "self-submitted, not yet live, needs manual review before tagging `business`." As of the self-serve-with-payment redesign (see section 7), every `/add-business` submission gets `business` added automatically — free ones immediately, paid ones once Stripe confirms payment — so nothing goes through this tag today. Left defined in case you ever want to hand-add a listing in a truly unpublished, review-first state again. |
 | `directory_lead` | Came in via the directory outreach, not yet engaged — apply this when you first import a prospect, before any workflow touches them. |
 | `dir_engaged` | Opened/clicked/replied to outreach — a workflow "add tag" action, not manual. |
 | `dir_claimed` | Claimed their listing — a hot lead. Added automatically by `submitClaim()` in `src/lib/submissions.ts`. |
 | `opt_in_voice` | Consented to AI-assisted calls (the `tcpaConsent` checkbox was checked on claim) — the outbound-call trigger. Added automatically by `submitClaim()`, only when consent was given. |
 | `dir_opt_out` | Suppress everything — respect this in every workflow's filter. |
-| `plan_featured` | Added automatically by `applyPlanUpgrade()` the moment a Stripe checkout for the Just Vybin' tier completes (live mode: from the Stripe webhook; mock mode: immediately). Removed automatically on a further upgrade to `plan_premium`. Exists so a GHL workflow can trigger off "Contact Tag Added" — see section 7 — rather than a broad "Contact Updated" firing on every unrelated edit. |
+| `plan_featured` | Added automatically by `applyPlanUpgrade()` the moment a Stripe checkout for the Good Vybin' tier completes (live mode: from the Stripe webhook; mock mode: immediately). Removed automatically on a further upgrade to `plan_premium`. Exists so a GHL workflow can trigger off "Contact Tag Added" — see section 7 — rather than a broad "Contact Updated" firing on every unrelated edit. |
 | `plan_premium` | Same as `plan_featured`, for the Full Thrivin' tier. Mutually exclusive with `plan_featured` — `applyPlanUpgrade()` removes the other one when adding this one. |
 | `consumer` | **A visitor account, not a listing.** Set by `registerConsumer()` in `src/lib/consumer-submissions.ts` — deliberately never co-occurs with `business` on the same contact, even if the same person also owns a claimed listing under a different contact record. See `docs/consumer-accounts.md`. |
 
@@ -233,6 +233,32 @@ below.
 A build takes ~1–2 minutes on Vercel, so there's a short lag between the GHL
 change and it going live — expected, not a bug.
 
+### Notifying yourself about a new self-signup
+
+Every `/add-business` submission — free or paid — goes live immediately with
+`claim_status: Pending`, not a review-gated draft (see section 3's note on
+`new_business_request`). "Pending" means *you* haven't personally followed up
+yet, not that the listing is hidden. You need to actually find out it
+happened.
+
+**Trigger:** "Contact Tag Added" → `business`, filtered to `claim_status =
+Pending`. This is the same tag event the Deploy Hook workflow above already
+listens for — add this as a **second, separate workflow** with the same
+trigger rather than a branch inside that one, so a mistake editing your
+notification logic can never accidentally break the rebuild, and vice versa.
+
+**Action:** GHL's "Internal Notification" action (or create a Task assigned
+to yourself) — whichever surfaces in wherever you actually check first.
+Include `{{contact.first_name}}` (the business name — see the first-name
+trap in section on Create Contact) and the `plan_tier` field in the
+notification body so you know at a glance whether this is a free listing to
+casually check or a paying customer to prioritize.
+
+**Why the filter matters:** `business` also gets added when you manually
+tag an admin-imported unclaimed listing (section 7's first workflow) — that
+case is `claim_status: Unclaimed`, not `Pending`, so this filter correctly
+skips it. You already know about those; you did them yourself.
+
 ### Auto-backfilling Google ratings on upgrade (`src/pages/api/webhooks/reviews.ts`)
 
 `npm run reviews` (see [google-apis.md](google-apis.md)) is still how ratings
@@ -271,10 +297,14 @@ payload shape doesn't match one of those.
 
 ### Owner self-serve / admin editing (`src/pages/manage/*`)
 
-Claimed, paid-tier owners can sign in at `/manage` (passwordless magic-link,
-email must match the contact's native `email` field, set at claim time) to
-edit their description, photo gallery, logo, and the two curated embeds above.
-You can also edit **any** listing — claimed or not, any tier — at
+Paid-tier owners can sign in at `/manage` (passwordless magic-link, email
+must match the contact's native `email` field) to edit their description,
+photo gallery, logo, and the two curated embeds above — `claim_status` of
+either `Claimed` or `Pending` qualifies, not just `Claimed`. A paid
+`/add-business` signup is `Pending` from the moment they pay, and they get
+self-serve access immediately rather than waiting on your manual review; only
+`Unclaimed` is locked out. You can also edit **any** listing — claimed or not,
+any tier — at
 `/manage/admin` behind a separate shared password (`ADMIN_PASSWORD`), on a
 client's behalf.
 
@@ -297,28 +327,26 @@ cookies, no users table).
 `submitClaim()` updates an existing contact, adds `dir_claimed` (and
 `opt_in_voice` if consent was checked) via the tags endpoint — never by
 overwriting the contact's `tags` array, which would silently strip `business`
-and unpublish the listing. `submitAddBusiness()` creates a new contact tagged
-`new_business_request` — deliberately **not** `business`, so a self-submitted
-listing stays off the live directory until reviewed and tagged manually.
+and unpublish the listing.
 
-### Getting notified about a new `/add-business` submission
+`submitAddBusiness()` creates a new contact for **any** of the three tiers,
+picked on the `/add-business` form itself (not a separate flow per tier):
 
-Review today is fully manual — nothing tells you a submission came in, you
-only see it by checking GHL. A two-minute GHL workflow fixes that, same
-"trigger → action" shape as every other workflow in this doc:
+- **Free:** tagged `business` immediately, in the same create-contact call.
+  Live the moment the form submits.
+- **Featured/premium:** created untagged. `/api/add-business` then sends the
+  visitor straight to Stripe (`createCheckoutSession()` with `activate:
+  true`); `business` only gets added by `applyPlanUpgrade()` once the
+  webhook confirms real payment (see section 7's Deploy Hook triggers) — so
+  nobody sees a paid listing that was never actually paid for, and nobody
+  pays and finds out afterward that it never went live.
 
-**Trigger:** "Contact Tag Added" → `new_business_request`.
-**Action:** whatever you want to be notified with — an internal email/SMS
-to yourself, a Slack/Teams webhook, GHL's own "Send Internal Notification"
-action if your plan has it. No webhook to this app needed for this one —
-it's purely GHL notifying **you**, not GHL notifying the site.
-
-Once you've reviewed a submission and are happy with it, publishing is still
-the same manual step as always: add the `business` tag yourself (and fill in
-anything worth improving first — see the description note in
-`docs/ai-descriptions.md`; nothing regenerates a self-submitted description
-automatically, so touching it up before publishing is a manual/human step,
-same as reviewing the rest of the submission).
+Either way, `claim_status` comes back `Pending` — not a review gate that
+blocks publishing, just a flag that a human (you) hasn't personally followed
+up yet. See "Notifying yourself about a new self-signup" in section 7 for
+how to actually find out one came in, and "touching up" a raw self-submitted
+description before it's been reviewed is still a manual step worth doing —
+see `docs/ai-descriptions.md` — nothing regenerates it automatically.
 
 `directory.ts`'s read path resolves GHL's per-field `id` back to the `key`
 above via a cached `GET /locations/:locationId/customFields` call (contact

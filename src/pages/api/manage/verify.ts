@@ -14,7 +14,8 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   if (!verified) return redirect("/manage/login?error=expired");
 
   const listing = await getListingById(verified.contactId);
-  const eligible = listing && listing.claimStatus === "claimed" && listing.planTier !== "free";
+  // See the matching comment in request-link.ts — "pending" is eligible too.
+  const eligible = listing && listing.claimStatus !== "unclaimed" && listing.planTier !== "free";
   if (!eligible) return redirect("/manage/login?error=ineligible");
 
   cookies.set(SESSION_COOKIE, createOwnerSessionCookie(verified.contactId), {

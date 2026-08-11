@@ -1,24 +1,27 @@
 ---
-// Static, same pattern as /claim/thanks — the business name is filled in
-// client-side from ?business= so the page itself stays plain prerendered HTML.
+// Static, same pattern as /claim/thanks — the business name (and now plan)
+// is filled in client-side from ?business=/?plan= so the page itself stays
+// plain prerendered HTML. Doubles as the Stripe success_url for a paid
+// signup (see createCheckoutSession's `activate` path in checkout.ts), so
+// the copy has to be honest for both: the listing is live immediately
+// either way — claim_status is Pending, not the page being unpublished.
 
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { site } from "../../config/site";
 ---
 
 <BaseLayout
-  title={`Submission received — ${site.name}`}
-  description="Your business submission is being reviewed."
+  title={`You're listed — ${site.name}`}
+  description="Your business is live on the directory."
 >
   <section class="mx-auto max-w-xl px-5 py-20 text-center">
-    <p class="meta font-bold text-signal">Submitted</p>
+    <p class="meta font-bold text-signal">Live now</p>
     <h1 class="font-display mt-3 text-head">
-      Thank you for adding your business to {site.name}
+      <span data-business-name>Your business</span> is live on {site.name}
     </h1>
-    <p data-business-name hidden class="meta mt-2 text-ink-soft"></p>
     <p class="mt-4 text-sub text-ink-soft">
-      We'll review your submission and it'll be posted promptly.
-      Questions in the meantime? Reach us at{" "}
+      We'll be in touch shortly to make sure everything looks right. Questions in the
+      meantime? Reach us at{" "}
       <a href={`mailto:${site.contactEmail}`} class="font-bold text-signal">
         {site.contactEmail}
       </a>.
@@ -30,12 +33,10 @@ import { site } from "../../config/site";
 </BaseLayout>
 
 <script>
-  const business = new URLSearchParams(location.search).get("business");
+  const params = new URLSearchParams(location.search);
+  const business = params.get("business");
   if (business) {
     const el = document.querySelector<HTMLElement>("[data-business-name]");
-    if (el) {
-      el.textContent = business;
-      el.hidden = false;
-    }
+    if (el) el.textContent = business;
   }
 </script>
