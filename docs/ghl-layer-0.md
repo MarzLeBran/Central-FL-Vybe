@@ -64,10 +64,15 @@ anything human-readable.
 | `hours` | Multi-line | `hours` |
 | `social_links` | Multi-line | `socialLinks` (`instagram=https://…` per line) |
 | `extra_links` | Multi-line | `extraLinks` — owner-curated link list (`Label\|https://…` per line, one per line). Structured fields only, deliberately not a raw-HTML/embed field — see the "no custom code" note where `ListingEditForm.astro` is introduced. |
-| `special_offer` | Text | `specialOffer` — free-text coupon/promo blurb, owner-edited, shown as a banner on the listing page |
+| `special_offer` | Text | `specialOffer` — free-text coupon/promo blurb, owner-edited, shown as a coupon card on the listing page and (if present) the homepage's "Today's Deals" row |
+| `special_offer_image` | Text | `specialOfferImageUrl` — optional photo for the deal card, a Vercel Blob URL like `logo_url` |
+| `blog_posts` | Multi-line | `blogPosts` — **JSON array**, not the "one line per entry" convention `social_links`/`extra_links` use. A post body can contain its own newlines, which would break that convention — see the note where `BlogPost` is defined in `src/types/listing.ts`. Malformed JSON here fails soft to no posts, not a build error. |
+| `news_items` | Multi-line | `newsItems` — same JSON-array convention as `blog_posts` |
+| `events` | Multi-line | `events` — same JSON-array convention as `blog_posts` |
+| `team` | Multi-line | `team` — same JSON-array convention as `blog_posts` |
 | `plan_tier` | Dropdown: `Free` \| `Featured` \| `Premium` | `planTier` — Just Chillin' / Good Vybin' / Full Thrivin' on `/pricing`; `normalizePlanTier()` also accepts "Spotlight"/"All Access" as synonyms (the tier names before this round of renaming). Upgraded automatically by Stripe checkout (Layer 4) once live. |
 | `claim_status` | Dropdown: `Unclaimed` \| `Pending` \| `Claimed` | `claimStatus` |
-| `ai_context` | Multi-line | `aiContext` — knowledge for the All Access per-listing agent (Layer 5) |
+| `ai_context` | Multi-line | `aiContext` — knowledge for the Full Thrivin' per-listing agent (Layer 5) |
 | `ai_agent_enabled` | Checkbox | `aiAgentEnabled` — Premium alone does NOT show the "Ask this business" card/widget; this must also be checked, by hand, once a real agent has actually been built for that specific business. Defaults unchecked/false on every listing, including new Premium ones. See `hasListingAgent()` in `src/types/listing.ts`. |
 | `agency_client` | Checkbox | `agencyClient` |
 | `client_location_id` | Text | `clientLocationId` — their own sub-account, once they're an agency client |
@@ -103,6 +108,7 @@ but nothing reads or writes it today:
 | `plan_featured` | Added automatically by `applyPlanUpgrade()` the moment a Stripe checkout for the Good Vybin' tier completes (live mode: from the Stripe webhook; mock mode: immediately). Removed automatically on a further upgrade to `plan_premium`. Exists so a GHL workflow can trigger off "Contact Tag Added" — see section 7 — rather than a broad "Contact Updated" firing on every unrelated edit. |
 | `plan_premium` | Same as `plan_featured`, for the Full Thrivin' tier. Mutually exclusive with `plan_featured` — `applyPlanUpgrade()` removes the other one when adding this one. |
 | `consumer` | **A visitor account, not a listing.** Set by `registerConsumer()` in `src/lib/consumer-submissions.ts` — deliberately never co-occurs with `business` on the same contact, even if the same person also owns a claimed listing under a different contact record. See `docs/consumer-accounts.md`. |
+| `agency_lead` | Interested in the agency retainer (custom website, review management, missed-call text-back, AI voice/chat agent) — submitted via `/grow`, which is deliberately separate from the directory plans and never linked from `/pricing`. Manual follow-up only; no automated next step. Added by `submitAgencyInterest()` in `src/lib/submissions.ts`. |
 
 ### Consumer-only custom fields (never used by `Listing`)
 
@@ -110,6 +116,16 @@ but nothing reads or writes it today:
 |---|---|---|
 | `avatar_url` | Text | Consumer's profile photo — Vercel Blob URL, written from `/account`. |
 | `followed_listings` | Multi-line | Comma-separated listing slugs this consumer follows — same CSV-in-a-text-field convention as `image_urls`. |
+
+### Agency-lead-only custom fields (never used by `Listing`)
+
+A `/grow` submission is a **new, separate contact** tagged `agency_lead` — not necessarily the same contact as an existing listing, even if the same business already has one. Manual follow-up, no automated next step.
+
+| Key | Type | Purpose |
+|---|---|---|
+| `agency_lead_business` | Text | The business name they typed in — kept separate from the native `firstName` field other contact types use for this, since an agency lead isn't a listing. |
+| `agency_interest` | Text | Comma-separated list of the services they checked (custom website, review management, missed-call text-back, AI voice/chat agent) — see `AGENCY_SERVICES` in `src/lib/agency.ts`. |
+| `agency_message` | Multi-line | Whatever they typed in the optional "anything else?" field. |
 
 ## 4. Private Integration token
 
@@ -401,7 +417,7 @@ identifies itself as calling on behalf of the business's own listing, framed
 as a courtesy call rather than a sales call. This depends on the
 `tcpa_consent*` fields above as its legal basis and is genuinely a "GHL AI"
 feature (their Voice AI / Conversation AI product), distinct from the
-per-listing text agent on All Access listings, which is this app's **own**
+per-listing text agent on Full Thrivin' listings, which is this app's **own**
 Vercel-hosted LLM widget, not a GHL product. Do not start building this
 before Layer 3 is live — flagged here only so the field/tag groundwork above
 doesn't need to be revisited later.

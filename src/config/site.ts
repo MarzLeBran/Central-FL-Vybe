@@ -19,8 +19,7 @@ export const site = {
   /** The market, spelled out. Used in copy and page titles. */
   market: "Central Florida",
 
-  /** Towns covered — shown in the dateline strip under the masthead.
-   *  First one is also used in the home page's "Run a business in ___?" CTA. */
+  /** Towns covered — shown in the dateline strip under the masthead. */
   towns: ["Orlando", "Kissimmee", "St. Cloud", "Sanford", "Melbourne"],
 
   /**
@@ -248,6 +247,7 @@ export const site = {
       name: "Dining",
       categories: [
         "Restaurants", "Bakeries", "Café & Brunch", "Mexican Restaurant", "Pizza", "Sushi",
+        "Food Trucks",
       ],
     },
     {

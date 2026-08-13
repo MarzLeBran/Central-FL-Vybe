@@ -48,6 +48,13 @@ if (!listing || !eligible) {
       View live listing &rarr;
     </a>
 
+    <a
+      href="/grow"
+      class="hue-block mt-6 flex items-center justify-between gap-3 border-2 border-rule px-4 py-3 text-sm font-bold"
+    >
+      Want us to actually run your marketing? &rarr;
+    </a>
+
     <div class="mt-8">
       <ListingEditForm
         listingId={listing.id}
@@ -63,6 +70,11 @@ if (!listing || !eligible) {
         socialLinks={listing.socialLinks}
         extraLinks={listing.extraLinks}
         specialOffer={listing.specialOffer}
+        specialOfferImageUrl={listing.specialOfferImageUrl}
+        blogPosts={listing.blogPosts}
+        newsItems={listing.newsItems}
+        events={listing.events}
+        team={listing.team}
       />
     </div>
   </section>

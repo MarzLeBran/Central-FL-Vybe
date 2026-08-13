@@ -54,10 +54,11 @@ THE TIERS (drives everything — names/prices live in src/config/site.ts)
 - Free ("Just Chillin'"), $0 forever: a REAL, complete listing — description,
   hours, phone, website, socials, map, structured data, claim button. Never
   crippled to force an upgrade — that's a hard rule, not a suggestion.
-- Featured ("Spotlight"), $250/yr: + Google reviews & map polish, gallery,
-  top placement, blog/events/news/jobs slots (those content types aren't
-  built yet — L7, deferred).
-- Premium ("All Access"), $699/yr: + AI response tools, promo video,
+- Featured ("Good Vybin'"), $249/yr: + Google reviews & map polish, gallery,
+  top placement, blog/events/news/team sections (built as sections on the
+  business's own page — a site-wide blog/events hub is the part still
+  deferred, L7).
+- Premium ("Full Thrivin'"), $699/yr: + AI response tools, promo video,
   everything, and the ONLY tier that gets its own per-listing AI text agent
   — and even then only once a real agent has actually been built for that
   specific business (a manual per-business flag, not automatic at Premium).

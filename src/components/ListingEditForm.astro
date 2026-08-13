@@ -4,6 +4,10 @@
 // src/pages/manage/admin/[slug].astro (admin, listingId comes from the URL) —
 // one edit UI to maintain, not two. Follows SearchBox.astro's plain
 // <script> + data-*-attribute DOM-hook convention; no UI framework.
+//
+// Blog/news/events/team share one generic list-editor pattern client-side
+// (makeEntriesController, in the script below) — they differ only in which
+// text fields they carry, not in the add/edit/remove/image-upload mechanics.
 
 interface Props {
   listingId: string;
@@ -19,6 +23,11 @@ interface Props {
   socialLinks?: Record<string, string>;
   extraLinks?: { label: string; url: string }[];
   specialOffer?: string;
+  specialOfferImageUrl?: string;
+  blogPosts?: { id: string; title: string; date: string; body: string; imageUrl?: string }[];
+  newsItems?: { id: string; title: string; date: string; body: string; imageUrl?: string }[];
+  events?: { id: string; title: string; date: string; time?: string; location?: string; description: string; imageUrl?: string }[];
+  team?: { id: string; name: string; role: string; bio?: string; imageUrl?: string }[];
 }
 
 const {
@@ -35,6 +44,11 @@ const {
   socialLinks = {},
   extraLinks = [],
   specialOffer,
+  specialOfferImageUrl,
+  blogPosts = [],
+  newsItems = [],
+  events = [],
+  team = [],
 } = Astro.props;
 
 const SOCIAL_NETWORKS: [string, string][] = [
@@ -191,6 +205,19 @@ const SOCIAL_NETWORKS: [string, string][] = [
       placeholder="e.g. 15% off first visit for new customers"
       class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
     />
+    <div class="mt-2 flex items-center gap-4">
+      <img
+        data-offer-image-preview
+        src={specialOfferImageUrl || undefined}
+        class:list={["h-16 w-16 border-2 border-rule bg-paper object-cover", !specialOfferImageUrl && "hidden"]}
+        alt=""
+      />
+      <input type="file" accept="image/*" data-offer-image-input class="text-sm" />
+    </div>
+    <input type="hidden" data-field="specialOfferImageUrl" value={specialOfferImageUrl ?? ""} />
+    <p class="mt-1 text-xs text-ink-mute">
+      Shows as a deal card on the homepage and your listing page. The photo is optional but makes it stand out more.
+    </p>
   </div>
 
   <div>
@@ -198,6 +225,32 @@ const SOCIAL_NETWORKS: [string, string][] = [
     <ul data-extra-links data-initial={JSON.stringify(extraLinks)} class="space-y-2"></ul>
     <button type="button" data-add-link class="meta mt-2 font-bold hover:text-signal">+ Add a link</button>
     <p class="mt-1 text-xs text-ink-mute">Up to 6 — a menu, a booking page, another location, anything with a URL.</p>
+  </div>
+
+  <div class="space-y-8 border-t-2 border-rule pt-8">
+    <div>
+      <p class="meta mb-1.5">Team (optional)</p>
+      <ul data-entries="team" data-initial={JSON.stringify(team)} class="space-y-3"></ul>
+      <button type="button" data-add-entry="team" class="meta mt-2 font-bold hover:text-signal">+ Add a team member</button>
+    </div>
+
+    <div>
+      <p class="meta mb-1.5">Events (optional)</p>
+      <ul data-entries="events" data-initial={JSON.stringify(events)} class="space-y-3"></ul>
+      <button type="button" data-add-entry="events" class="meta mt-2 font-bold hover:text-signal">+ Add an event</button>
+    </div>
+
+    <div>
+      <p class="meta mb-1.5">News (optional)</p>
+      <ul data-entries="newsItems" data-initial={JSON.stringify(newsItems)} class="space-y-3"></ul>
+      <button type="button" data-add-entry="newsItems" class="meta mt-2 font-bold hover:text-signal">+ Add a news story</button>
+    </div>
+
+    <div>
+      <p class="meta mb-1.5">Blog (optional)</p>
+      <ul data-entries="blogPosts" data-initial={JSON.stringify(blogPosts)} class="space-y-3"></ul>
+      <button type="button" data-add-entry="blogPosts" class="meta mt-2 font-bold hover:text-signal">+ Add a blog post</button>
+    </div>
   </div>
 
   <button type="button" data-save class="bg-signal px-5 py-3.5 text-sm font-bold text-paper hover:bg-signal-sunk">
@@ -212,6 +265,36 @@ const SOCIAL_NETWORKS: [string, string][] = [
   // Values go into innerHTML as attribute content — escape the quote that
   // would otherwise break out of the attribute (renderExtraLinks below).
   const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  // Same idea for values going into innerHTML as element TEXT content
+  // (textarea bodies below) — escaping < and > keeps a stray "</textarea>"
+  // or "<script>" in someone's post body from breaking out of the tag.
+  const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  type EntryField = { key: string; label: string; type: "text" | "date" | "textarea" };
+  const ENTRY_TYPES: Record<string, EntryField[]> = {
+    team: [
+      { key: "name", label: "Name", type: "text" },
+      { key: "role", label: "Role", type: "text" },
+      { key: "bio", label: "Short bio (optional)", type: "textarea" },
+    ],
+    events: [
+      { key: "title", label: "Event title", type: "text" },
+      { key: "date", label: "Date", type: "date" },
+      { key: "time", label: "Time (optional)", type: "text" },
+      { key: "location", label: "Location (optional)", type: "text" },
+      { key: "description", label: "Description", type: "textarea" },
+    ],
+    newsItems: [
+      { key: "title", label: "Headline", type: "text" },
+      { key: "date", label: "Date", type: "date" },
+      { key: "body", label: "Story", type: "textarea" },
+    ],
+    blogPosts: [
+      { key: "title", label: "Post title", type: "text" },
+      { key: "date", label: "Date", type: "date" },
+      { key: "body", label: "Post", type: "textarea" },
+    ],
+  };
 
   document.querySelectorAll<HTMLElement>("[data-edit-form]").forEach((root) => {
     const listingId = root.dataset.listingId!;
@@ -389,6 +472,104 @@ const SOCIAL_NETWORKS: [string, string][] = [
       }
     });
 
+    const offerImageField = root.querySelector<HTMLInputElement>('[data-field="specialOfferImageUrl"]')!;
+    const offerImageInput = root.querySelector<HTMLInputElement>("[data-offer-image-input]")!;
+    const offerImagePreview = root.querySelector<HTMLImageElement>("[data-offer-image-preview]")!;
+    offerImageInput.addEventListener("change", async () => {
+      const file = offerImageInput.files?.[0];
+      if (!file) return;
+      showStatus("Uploading photo…", "ok");
+      try {
+        const url = await uploadOne(file);
+        offerImageField.value = url;
+        offerImagePreview.src = url;
+        offerImagePreview.classList.remove("hidden");
+        status.classList.add("hidden");
+      } catch (err) {
+        showStatus(`Upload failed: ${(err as Error).message}`, "error");
+      } finally {
+        offerImageInput.value = "";
+      }
+    });
+
+    // Shared list-editor for team/events/news/blog — same add/edit/remove/
+    // image-upload mechanics for all four, they only differ in which text
+    // fields they carry (ENTRY_TYPES above). One controller instance per
+    // content type; getValues() is called at save time.
+    function makeEntriesController(key: string, fields: EntryField[]) {
+      const container = root.querySelector<HTMLElement>(`[data-entries="${key}"]`)!;
+      const addBtn = root.querySelector<HTMLButtonElement>(`[data-add-entry="${key}"]`)!;
+      let items: Record<string, string>[] = JSON.parse(container.dataset.initial || "[]");
+
+      const render = () => {
+        container.innerHTML = items
+          .map((item, i) => {
+            const fieldsHtml = fields
+              .map((f) =>
+                f.type === "textarea"
+                  ? `<textarea data-entry-field="${f.key}" rows="3" placeholder="${f.label}" class="w-full border-2 border-rule bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none">${escapeHtml(item[f.key] ?? "")}</textarea>`
+                  : `<input data-entry-field="${f.key}" type="${f.type}" value="${escapeAttr(item[f.key] ?? "")}" placeholder="${f.label}" class="w-full border-2 border-rule bg-paper px-3 py-2 text-sm focus:border-ink focus:outline-none" />`
+              )
+              .join("");
+            return `
+        <li data-i="${i}" class="space-y-2 border-2 border-rule p-3">
+          ${fieldsHtml}
+          <div class="flex items-center gap-3">
+            <img data-entry-image-preview src="${item.imageUrl ?? ""}" class="h-12 w-12 border-2 border-rule bg-paper object-cover ${item.imageUrl ? "" : "hidden"}" alt="" />
+            <input type="file" accept="image/*" data-entry-image-input class="text-xs" />
+            <button type="button" data-remove-entry aria-label="Remove" class="meta ml-auto font-bold text-ink-mute hover:text-signal">Remove</button>
+          </div>
+        </li>`;
+          })
+          .join("");
+      };
+
+      container.addEventListener("input", (e) => {
+        const li = (e.target as HTMLElement).closest<HTMLLIElement>("li[data-i]");
+        const fieldEl = (e.target as HTMLElement).closest<HTMLInputElement | HTMLTextAreaElement>("[data-entry-field]");
+        if (!li || !fieldEl) return;
+        items[Number(li.dataset.i)][fieldEl.dataset.entryField!] = fieldEl.value;
+      });
+
+      container.addEventListener("click", (e) => {
+        const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-remove-entry]");
+        if (!btn) return;
+        items.splice(Number(btn.closest<HTMLLIElement>("li[data-i]")!.dataset.i), 1);
+        render();
+      });
+
+      container.addEventListener("change", async (e) => {
+        const input = (e.target as HTMLElement).closest<HTMLInputElement>("[data-entry-image-input]");
+        if (!input) return;
+        const li = input.closest<HTMLLIElement>("li[data-i]")!;
+        const i = Number(li.dataset.i);
+        const file = input.files?.[0];
+        if (!file) return;
+        showStatus("Uploading photo…", "ok");
+        try {
+          items[i].imageUrl = await uploadOne(file);
+          status.classList.add("hidden");
+          render();
+        } catch (err) {
+          showStatus(`Upload failed: ${(err as Error).message}`, "error");
+        }
+      });
+
+      addBtn.addEventListener("click", () => {
+        if (items.length >= 20) return;
+        items.push({});
+        render();
+      });
+
+      render();
+      return { getValues: () => items };
+    }
+
+    const teamEntries = makeEntriesController("team", ENTRY_TYPES.team);
+    const eventsEntries = makeEntriesController("events", ENTRY_TYPES.events);
+    const newsEntries = makeEntriesController("newsItems", ENTRY_TYPES.newsItems);
+    const blogEntries = makeEntriesController("blogPosts", ENTRY_TYPES.blogPosts);
+
     // Toggles between the textarea and a rendered preview — reuses the exact
     // publish-time renderer server-side (src/lib/markdown.ts), so what's
     // shown here is exactly what the live page will show, not an
@@ -448,6 +629,11 @@ const SOCIAL_NETWORKS: [string, string][] = [
             ),
             extraLinks: extraLinks.filter((l) => l.label.trim() && l.url.trim()),
             specialOffer: specialOfferField.value || undefined,
+            specialOfferImageUrl: offerImageField.value || undefined,
+            team: teamEntries.getValues(),
+            events: eventsEntries.getValues(),
+            newsItems: newsEntries.getValues(),
+            blogPosts: blogEntries.getValues(),
           }),
         });
         const result = await res.json();

@@ -155,8 +155,18 @@ if (listing.rating && listing.reviewCount) {
 
     {
       listing.specialOffer && (
-        <div class="hue-block mt-6 flex items-center gap-3 border-2 border-rule px-4 py-3">
-          <span class="text-xl" aria-hidden="true">&#127903;</span>
+        <div class="hue-block mt-6 flex items-center gap-4 border-2 border-rule p-3">
+          {
+            listing.specialOfferImageUrl ? (
+              <img
+                src={listing.specialOfferImageUrl}
+                alt=""
+                class="h-16 w-16 shrink-0 border-2 border-ink object-cover"
+              />
+            ) : (
+              <span class="text-2xl" aria-hidden="true">🏷️</span>
+            )
+          }
           <p class="text-sm font-bold">{listing.specialOffer}</p>
         </div>
       )
@@ -311,6 +321,111 @@ if (listing.rating && listing.reviewCount) {
         />
       </div>
     </div>
+
+    {/* Team/events/news/blog — Good Vybin'/Full Thrivin' content sections
+        (site.planFeatures: "Feature your team", "Add events", "Share news
+        stories", "Custom blog"). Each is optional and only renders once the
+        owner has actually added something, via ListingEditForm.astro. */}
+
+    {
+      listing.team && listing.team.length > 0 && (
+        <div class="mt-10 border-t-2 border-rule pt-8">
+          <h2 class="font-display text-2xl font-extrabold tracking-tight">Meet the team</h2>
+          <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {listing.team.map((member) => (
+              <div class="border-2 border-rule p-4 text-center">
+                {
+                  member.imageUrl ? (
+                    <img
+                      src={member.imageUrl}
+                      alt={member.name}
+                      class="mx-auto h-20 w-20 rounded-full border-2 border-rule object-cover"
+                    />
+                  ) : (
+                    <div class="mx-auto h-20 w-20 rounded-full border-2 border-rule bg-paper-sunk" />
+                  )
+                }
+                <p class="font-display mt-3 font-bold">{member.name}</p>
+                <p class="meta hue-fg font-bold">{member.role}</p>
+                {member.bio && <p class="mt-2 text-sm text-ink-soft">{member.bio}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    {
+      listing.events && listing.events.length > 0 && (
+        <div class="mt-10 border-t-2 border-rule pt-8">
+          <h2 class="font-display text-2xl font-extrabold tracking-tight">Upcoming events</h2>
+          <div class="mt-5 grid gap-5 sm:grid-cols-2">
+            {listing.events.map((event) => (
+              <div class="flex gap-4 border-2 border-rule p-4">
+                {
+                  event.imageUrl && (
+                    <img src={event.imageUrl} alt="" class="h-20 w-20 shrink-0 border-2 border-rule object-cover" />
+                  )
+                }
+                <div class="min-w-0">
+                  <p class="meta hue-fg font-bold">
+                    {event.date}
+                    {event.time && ` · ${event.time}`}
+                  </p>
+                  <p class="font-display mt-1 font-bold">{event.title}</p>
+                  {event.location && <p class="text-xs text-ink-mute">{event.location}</p>}
+                  <p class="mt-1.5 whitespace-pre-wrap text-sm text-ink-soft">{event.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    {
+      listing.newsItems && listing.newsItems.length > 0 && (
+        <div class="mt-10 border-t-2 border-rule pt-8">
+          <h2 class="font-display text-2xl font-extrabold tracking-tight">News</h2>
+          <div class="mt-5 space-y-5">
+            {listing.newsItems.map((item) => (
+              <article class="border-2 border-rule p-4">
+                {
+                  item.imageUrl && (
+                    <img src={item.imageUrl} alt="" class="mb-3 aspect-[21/9] w-full border-2 border-rule object-cover" />
+                  )
+                }
+                <p class="meta hue-fg font-bold">{item.date}</p>
+                <h3 class="font-display mt-1 text-lg font-bold">{item.title}</h3>
+                <p class="mt-1.5 whitespace-pre-wrap text-sm text-ink-soft">{item.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    {
+      listing.blogPosts && listing.blogPosts.length > 0 && (
+        <div class="mt-10 border-t-2 border-rule pt-8">
+          <h2 class="font-display text-2xl font-extrabold tracking-tight">From the blog</h2>
+          <div class="mt-5 space-y-5">
+            {listing.blogPosts.map((post) => (
+              <article class="border-2 border-rule p-4">
+                {
+                  post.imageUrl && (
+                    <img src={post.imageUrl} alt="" class="mb-3 aspect-[21/9] w-full border-2 border-rule object-cover" />
+                  )
+                }
+                <p class="meta hue-fg font-bold">{post.date}</p>
+                <h3 class="font-display mt-1 text-lg font-bold">{post.title}</h3>
+                <p class="mt-1.5 whitespace-pre-wrap text-sm text-ink-soft">{post.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      )
+    }
 
     {
       listing.claimStatus === "unclaimed" && (

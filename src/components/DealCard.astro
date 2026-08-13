@@ -1,0 +1,61 @@
+---
+// One business's special offer, as a tile — the homepage Deals row and
+// (later, if needed) anywhere else a coupon card makes sense. Deliberately
+// its own component rather than a mode of ListingCard.astro: the whole
+// point is that it reads as a coupon, not a listing (signal-coloured border,
+// the deal text is the headline, business name is secondary).
+//
+// "Get This Deal" goes straight to the business's own website when they
+// have one — the deal is redeemed there, not on the directory — falling
+// back to their listing page for the (rarer) business that hasn't set a
+// website yet.
+
+import type { Listing } from "../types/listing";
+
+interface Props {
+  listing: Listing;
+  index?: number;
+}
+
+const { listing, index = 0 } = Astro.props;
+const ctaHref = listing.website || `/business/${listing.slug}`;
+const external = !!listing.website;
+---
+
+<a
+  href={ctaHref}
+  target={external ? "_blank" : undefined}
+  rel={external ? "nofollow noopener" : undefined}
+  data-reveal
+  data-reveal-index={index}
+  class="lift group flex flex-col border-2 border-rule bg-paper"
+>
+  <div class="relative aspect-[16/10] w-full overflow-hidden border-b-4 border-signal bg-paper-sunk">
+    {
+      listing.specialOfferImageUrl ? (
+        <img
+          src={listing.specialOfferImageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          class="h-full w-full object-cover"
+        />
+      ) : (
+        <div class="flex h-full items-center justify-center text-4xl" aria-hidden="true">
+          🏷️
+        </div>
+      )
+    }
+    <span class="chip absolute left-0 top-0 bg-signal font-bold text-paper">Deal</span>
+  </div>
+
+  <div class="flex flex-1 flex-col p-4">
+    <p class="meta font-bold text-ink-mute">{listing.businessName}</p>
+    <p class="font-display mt-1 text-lg font-extrabold leading-tight tracking-tight">
+      {listing.specialOffer}
+    </p>
+    <p class="meta mt-auto pt-3 font-bold text-signal group-hover:text-signal-sunk">
+      Get This Deal &rarr;
+    </p>
+  </div>
+</a>

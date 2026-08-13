@@ -91,7 +91,7 @@ When Google reviews get wired up:
 1. **Fetch only for paid listings.** Guard every Place Details call with
    `isPaidTier(listing.planTier)` from [`src/types/listing.ts`](../src/types/listing.ts).
    This is what keeps the cost at ~$2 instead of $120, and it is why "Google
-   reviews" is a Spotlight/All Access row on `/pricing`.
+   reviews" is a Good Vybin'/Full Thrivin' row on `/pricing`.
 2. **Cache; never refetch per build.** A static build touches every listing every
    time. Persist review data with a timestamp and refresh on a schedule, not on
    deploy. Google's terms also restrict how long Places content may be cached —
@@ -129,6 +129,76 @@ logged rather than matched by name/address guesswork. Results are cached in
 `out/reviews-cache.json` (gitignored) with a `fetchedAt` timestamp — that
 cache, not the schedule you run it on, is what actually prevents re-billing a
 listing that was just refreshed.
+
+## Traffic analytics — two, deliberately separate
+
+Neither of these is a Google Places/Maps product, but they're documented
+here alongside the other "optional, external-service" features on this page.
+
+**Vercel Analytics** — `@vercel/analytics`'s `<Analytics />` component in
+`BaseLayout.astro`, on every page unconditionally. The code side is done;
+it still needs enabling in **Vercel Dashboard → your project → Analytics
+tab → Enable** before any data actually shows up there — the component
+alone doesn't turn tracking on. Page views, visitor counts, top pages,
+referrers, countries. Free tier is capped on event volume; upgrade if this
+directory outgrows it.
+
+**Google Analytics 4** — set `PUBLIC_GA_MEASUREMENT_ID` (starts with `G-`)
+and the `gtag.js` script loads automatically in `BaseLayout.astro`; unset
+and nothing loads at all, same "absent until configured" pattern as
+`PUBLIC_GHL_WIDGET_ID`. No code changes needed to turn this on — just:
+
+1. Create a free GA4 property at [analytics.google.com](https://analytics.google.com)
+2. Copy its Measurement ID
+3. Set `PUBLIC_GA_MEASUREMENT_ID` in `.env` (local) and Vercel's Environment
+   Variables (production), then trigger a genuinely fresh deploy — same env-var
+   gotcha as everywhere else in this project, "Redeploy" alone can reuse a
+   stale build.
+
+Free with no real usage cap, and considerably deeper than Vercel
+Analytics — behavior flow, which listings get clicked, device/location
+breakdowns. Both can run at once; they don't conflict or double-count
+against each other, since each is its own separate script/service.
+
+## Address autocomplete on `/add-business` — free, if used correctly
+
+`src/pages/add-business.astro` optionally shows a Google Places search-as-you-type
+assist above the plain address field — purely additive, the real `#address`
+`<input>` is a normal text field the whole time and works identically whether
+or not this is configured. Absent entirely unless `PUBLIC_GOOGLE_PLACES_API_KEY`
+is set (see `.env.example`).
+
+**This must use `PlaceAutocompleteElement` ("Autocomplete (New)"), never the
+legacy `google.maps.places.Autocomplete` widget** — they are billed
+completely differently. The legacy widget is per-request with no free
+allowance. The new element uses **session-based pricing**: the free-text
+predictions as someone types are free within a session, and the session
+"closes" for free (under the 10,000/month free Essentials allowance) only if
+it ends with a `fetchFields()` call requesting **Basic Data** fields (like
+`formattedAddress` — what this code requests, nothing more). Request
+Contact or Atmosphere data instead and the session jumps to a paid SKU. A
+session that's *abandoned* (the visitor types but never selects a
+suggestion) doesn't get the free session rate — but at directory scale,
+occasional abandoned sessions are not a real cost concern.
+
+**This is a different key from `GOOGLE_PLACES_API_KEY` above, and the two
+must never be swapped.** `GOOGLE_PLACES_API_KEY` runs server-side in scripts
+and must never reach the browser. `PUBLIC_GOOGLE_PLACES_API_KEY` is the
+opposite — it's *meant* to be visible in browser JavaScript (Astro's
+`PUBLIC_` prefix ships it to the client), so it must instead be locked down
+in Google Cloud Console: **HTTP referrer restriction** to this site's
+domain(s), and **API restriction** to just the Places API. An unrestricted
+browser key is a key anyone can copy out of your page source and spend
+against.
+
+**Unverified, flagged honestly:** the exact `PlaceAutocompleteElement`
+JavaScript API (event name `gmp-select`, `.toPlace()`, `.fetchFields()`) was
+written from Google's current documented pattern, not confirmed against a
+live API key. Smoke-test with a real key before relying on it — if Google
+has changed the surface, the whole thing fails silently closed (the plain
+address input keeps working regardless, per the try/catch around it), so a
+break here would be invisible unless someone actually goes looking for the
+autocomplete assist and finds it missing.
 
 ## Keys
 

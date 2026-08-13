@@ -7,7 +7,7 @@
 // and fill in fetchFromGHL(). Nothing else in the app changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Listing } from "../types/listing";
+import type { Listing, BlogPost, NewsItem, EventItem, TeamMember } from "../types/listing";
 import { isPaidTier } from "../types/listing";
 import mock from "../data/mock-listings.json";
 
@@ -167,6 +167,11 @@ function mapContactToListing(c: any, keyMap: Map<string, string>): Listing {
     bookingUrl: cf("booking_url") || undefined,
     extraLinks: parseExtraLinks(cf("extra_links")),
     specialOffer: cf("special_offer") || undefined,
+    specialOfferImageUrl: cf("special_offer_image") || undefined,
+    blogPosts: parseJsonList<BlogPost>(cf("blog_posts")),
+    newsItems: parseJsonList<NewsItem>(cf("news_items")),
+    events: parseJsonList<EventItem>(cf("events")),
+    team: parseJsonList<TeamMember>(cf("team")),
     planTier: normalizePlanTier(cf("plan_tier")),
     claimStatus: (cf("claim_status") ?? "unclaimed").toLowerCase() as Listing["claimStatus"],
     email: c.email || undefined,
@@ -238,6 +243,26 @@ export function serializeExtraLinks(links: { label: string; url: string }[] | un
     .filter((l) => l.label && l.url)
     .map((l) => `${l.label}|${l.url}`)
     .join("\n");
+}
+
+// blog_posts/news_items/events/team hold a JSON array, not the "one line per
+// entry" convention above — an entry's body/bio text can itself contain
+// newlines, which would break that convention. Malformed/hand-edited JSON in
+// GHL fails soft to an empty list rather than breaking the build.
+function parseJsonList<T>(v: unknown): T[] | undefined {
+  if (Array.isArray(v)) return v as T[]; // already structured (mock data)
+  if (typeof v !== "string" || !v.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(v);
+    return Array.isArray(parsed) && parsed.length ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Inverse of parseJsonList — used by submissions.ts for blog/news/events/team. */
+export function serializeJsonList(items: unknown[] | undefined): string {
+  return items && items.length ? JSON.stringify(items) : "";
 }
 
 export const slugify = (s: string) =>

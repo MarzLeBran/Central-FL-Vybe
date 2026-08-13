@@ -61,6 +61,16 @@ out before) without ever paying — Stripe's browser redirect proves nothing.
 event. `/api/checkout` itself never upgrades anything in live mode; it only
 starts the session.
 
+**Promo codes.** Checkout sessions are created with `allow_promotion_codes: true`,
+which adds an "Add promotion code" link on Stripe's hosted checkout page —
+no code change needed to actually create or manage codes. In the Stripe
+dashboard: **Coupons** → New (define the discount — percent off, fixed
+amount, one-time or repeating), then **Promotion codes** → New (the actual
+code a customer types in, e.g. `FOUNDERS20`, attached to that coupon — set
+an optional redemption limit or expiration here). Works identically for both
+checkout entry points (`/upgrade` and the paid `/add-business` signup),
+since both call the same `createCheckoutSession()`.
+
 No dependency on the `stripe` npm package — both the session-create call and
 the webhook signature check (`verifyStripeSignature()` in `checkout.ts`, a few
 lines of HMAC-SHA256 over Node's `crypto`) are plain `fetch`/`crypto`, the same

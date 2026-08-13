@@ -3,18 +3,20 @@
 // Loads on the home page, category/search/add-business pages, and FREE listing pages.
 // Suppressed on Featured listing pages (see [slug].astro routing).
 // Add your GHL widget id to .env as PUBLIC_GHL_WIDGET_ID once you have it.
+//
+// Renders nothing at all until that id is set — no placeholder bubble.
+// A "Directory assistant" pill that opens nothing on click is worse than no
+// widget: it promises a feature that doesn't exist yet.
 const widgetId = import.meta.env.PUBLIC_GHL_WIDGET_ID;
 ---
 
-{widgetId ? (
-  <script
-    src="https://widgets.leadconnectorhq.com/loader.js"
-    data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js"
-    data-widget-id={widgetId}
-    defer
-  ></script>
-) : (
-  <div class="fixed bottom-5 right-5 z-50 rounded-full bg-slate-900 px-4 py-3 text-sm text-white shadow-lg">
-    💬 Directory assistant
-  </div>
-)}
+{
+  widgetId && (
+    <script
+      src="https://widgets.leadconnectorhq.com/loader.js"
+      data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js"
+      data-widget-id={widgetId}
+      defer
+    ></script>
+  )
+}

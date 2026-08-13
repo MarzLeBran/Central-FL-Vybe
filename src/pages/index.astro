@@ -5,6 +5,7 @@
 
 import BaseLayout from "../layouts/BaseLayout.astro";
 import ListingCard from "../components/ListingCard.astro";
+import DealCard from "../components/DealCard.astro";
 import SearchBox from "../components/SearchBox.astro";
 import { site } from "../config/site";
 import { categorySlug } from "../lib/slug";
@@ -12,6 +13,7 @@ import { categoryHues } from "../lib/categories";
 import { getListings, getFeaturedListings, getListingsByCategory } from "../lib/directory";
 
 const listings = await getListings();
+const deals = listings.filter((l) => l.specialOffer).slice(0, 8);
 const featured = (await getFeaturedListings()).slice(0, 15);
 // "unclaimed" specifically, not just "not yet claimed" — a self-signup via
 // /add-business is already Pending (has an owner attached from the moment
@@ -65,6 +67,23 @@ const channels = site.channels.filter((c) => c.url);
       </div>
     </div>
   </section>
+
+  {
+    deals.length > 0 && (
+      <section class="mx-auto max-w-6xl px-5 pt-14 pb-12">
+        <div class="rule-capped pt-5">
+          <div class="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 class="font-display text-head">Today's Deals</h2>
+            <span class="meta">Straight from local businesses</span>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {deals.map((listing, i) => <DealCard listing={listing} index={i} />)}
+        </div>
+      </section>
+    )
+  }
 
   {
     featured.length > 0 && (
@@ -166,7 +185,7 @@ const channels = site.channels.filter((c) => c.url);
     <div class="hue-lagoon">
       <div class="hue-block px-6 py-10 sm:px-10">
         <h2 class="font-display max-w-xl text-head">
-          Run a business in {site.towns[0]}? You may already be on here.
+          Run a business in {site.market}? You may already be on here.
         </h2>
         <p class="mt-3 max-w-xl text-sub opacity-80">
           Every listing is free and stays free — photos, hours, map, links, the lot.
@@ -176,7 +195,7 @@ const channels = site.channels.filter((c) => c.url);
           <a href="/listings" class="bg-ink px-5 py-3 text-sm font-bold text-paper">
             Find your listing to claim it &rarr;
           </a>
-          <a href="/add-business" class="border-2 border-ink px-5 py-3 text-sm font-bold">
+          <a href="/pricing" class="border-2 border-ink px-5 py-3 text-sm font-bold">
             Not listed yet? Add your business &rarr;
           </a>
         </div>

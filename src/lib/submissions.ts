@@ -9,7 +9,8 @@
 
 import { mkdirSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { slugify, serializeSocialLinks, serializeExtraLinks } from "./directory";
+import { slugify, serializeSocialLinks, serializeExtraLinks, serializeJsonList } from "./directory";
+import type { BlogPost, NewsItem, EventItem, TeamMember } from "../types/listing";
 
 const DATA_SOURCE = import.meta.env.DATA_SOURCE ?? "mock";
 const GHL_VERSION = "2021-07-28";
@@ -172,6 +173,59 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<AddBus
   return { ok: true, contactId };
 }
 
+export interface AgencyInterestInput extends ConsentMeta {
+  businessName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  services: string[]; // e.g. ["Custom website", "Review management"] — checkboxes on /grow
+  message?: string;
+}
+
+/**
+ * A "/grow" submission — interest in the agency retainer (custom website,
+ * review management, social auto-posting, missed-call text-back, AI voice
+ * agents), sold entirely separately from the directory plans and never on
+ * `/pricing` — see the golden rule in AGENTS.md. Deliberately NOT tied to an
+ * existing listing/claim; anyone can express interest, not just claimed
+ * owners, even though the page is mainly linked from post-claim moments.
+ * Creates a new contact tagged `agency_lead` for manual follow-up — no
+ * automated next step, this is a sales conversation, not a checkout.
+ */
+export async function submitAgencyInterest(input: AgencyInterestInput): Promise<Result> {
+  const submittedAt = new Date().toISOString();
+
+  if (DATA_SOURCE !== "ghl") {
+    logDev("agency-interest", { ...input, submittedAt });
+    return { ok: true };
+  }
+
+  const token = requireEnv("GHL_PIT_TOKEN");
+  const locationId = requireEnv("GHL_LOCATION_ID");
+  if (!token || !locationId) return { ok: false, error: "GHL env vars are not set" };
+
+  const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
+    method: "POST",
+    headers: ghlHeaders(token),
+    body: JSON.stringify({
+      locationId,
+      firstName: input.contactName,
+      email: input.email,
+      phone: input.phone,
+      tags: ["agency_lead"],
+      customFields: [
+        { key: "agency_lead_business", fieldValue: input.businessName },
+        { key: "agency_interest", fieldValue: input.services.join(", ") },
+        { key: "agency_message", fieldValue: input.message ?? "" },
+        ...consentFields(input, submittedAt),
+      ],
+    }),
+  });
+
+  if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
+  return { ok: true };
+}
+
 /**
  * A checkout succeeded — write the new plan tier back to GHL. Called from
  * `/api/checkout` in mock mode (there's no real payment to wait on) and from
@@ -244,6 +298,11 @@ export interface ListingUpdateInput {
   socialLinks?: Record<string, string>;
   extraLinks?: { label: string; url: string }[];
   specialOffer?: string;
+  specialOfferImageUrl?: string;
+  blogPosts?: BlogPost[];
+  newsItems?: NewsItem[];
+  events?: EventItem[];
+  team?: TeamMember[];
 }
 
 /**
@@ -285,6 +344,11 @@ export async function submitListingUpdate(input: ListingUpdateInput): Promise<Re
         { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
         { key: "extra_links", fieldValue: serializeExtraLinks(input.extraLinks) },
         { key: "special_offer", fieldValue: input.specialOffer ?? "" },
+        { key: "special_offer_image", fieldValue: input.specialOfferImageUrl ?? "" },
+        { key: "blog_posts", fieldValue: serializeJsonList(input.blogPosts) },
+        { key: "news_items", fieldValue: serializeJsonList(input.newsItems) },
+        { key: "events", fieldValue: serializeJsonList(input.events) },
+        { key: "team", fieldValue: serializeJsonList(input.team) },
       ],
     }),
   });

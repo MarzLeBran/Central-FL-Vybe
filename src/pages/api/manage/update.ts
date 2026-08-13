@@ -22,6 +22,53 @@ const SOCIAL_NETWORKS = ["facebook", "instagram", "x", "linkedin", "tiktok", "yo
 const DESCRIPTION_MAX = 10000;
 const OFFER_MAX = 300;
 const EXTRA_LINKS_MAX = 6;
+const ENTRY_LIST_MAX = 20; // per content type (blog/news/events/team)
+const ENTRY_TITLE_MAX = 200;
+const ENTRY_TEXT_MAX = 5000;
+
+type EntryFieldSpec = { key: string; max: number; required?: boolean };
+
+// Shared validator for the four "list of structured entries" content types —
+// blog/news/events/team differ only in which fields they carry, not in the
+// shape of the validation (cap count, trim/cap each field, validate the
+// optional image url). Returns entries with only truthy fields kept, drops
+// any entry that's entirely blank (e.g. an "Add" row nobody filled in).
+function parseEntryList(
+  raw: unknown,
+  fields: EntryFieldSpec[],
+  label: string
+): { ok: true; entries: Record<string, unknown>[] } | { ok: false; error: string } {
+  const list = Array.isArray(raw) ? raw : [];
+  if (list.length > ENTRY_LIST_MAX) {
+    return { ok: false, error: `no more than ${ENTRY_LIST_MAX} ${label} entries` };
+  }
+  const entries: Record<string, unknown>[] = [];
+  for (const item of list) {
+    const entry: Record<string, unknown> = { id: String((item as any)?.id || crypto.randomUUID()) };
+    let hasAny = false;
+    for (const f of fields) {
+      const val = String((item as any)?.[f.key] ?? "").trim();
+      if (val) hasAny = true;
+      if (val.length > f.max) {
+        return { ok: false, error: `a ${label} entry's ${f.key} must be under ${f.max} characters` };
+      }
+      if (val) entry[f.key] = val;
+    }
+    if (!hasAny) continue; // a blank row the owner added then never filled in
+    for (const f of fields) {
+      if (f.required && !entry[f.key]) {
+        return { ok: false, error: `every ${label} entry needs a ${f.key}` };
+      }
+    }
+    const imageUrl = (item as any)?.imageUrl ? String((item as any).imageUrl) : undefined;
+    if (imageUrl) {
+      if (!isBlobUrl(imageUrl)) return { ok: false, error: `invalid image url in a ${label} entry` };
+      entry.imageUrl = imageUrl;
+    }
+    entries.push(entry);
+  }
+  return { ok: true, entries };
+}
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   if (!isSameOrigin(request)) {
@@ -85,6 +132,57 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return json({ ok: false, error: `special offer must be under ${OFFER_MAX} characters` }, 400);
   }
 
+  const specialOfferImageUrl = body.specialOfferImageUrl ? String(body.specialOfferImageUrl) : undefined;
+  if (specialOfferImageUrl && !isBlobUrl(specialOfferImageUrl)) {
+    return json({ ok: false, error: "invalid special offer image url" }, 400);
+  }
+
+  const blogResult = parseEntryList(
+    body.blogPosts,
+    [
+      { key: "title", max: ENTRY_TITLE_MAX, required: true },
+      { key: "date", max: 20 },
+      { key: "body", max: ENTRY_TEXT_MAX, required: true },
+    ],
+    "blog post"
+  );
+  if (!blogResult.ok) return json(blogResult, 400);
+
+  const newsResult = parseEntryList(
+    body.newsItems,
+    [
+      { key: "title", max: ENTRY_TITLE_MAX, required: true },
+      { key: "date", max: 20 },
+      { key: "body", max: ENTRY_TEXT_MAX, required: true },
+    ],
+    "news story"
+  );
+  if (!newsResult.ok) return json(newsResult, 400);
+
+  const eventsResult = parseEntryList(
+    body.events,
+    [
+      { key: "title", max: ENTRY_TITLE_MAX, required: true },
+      { key: "date", max: 20 },
+      { key: "time", max: 40 },
+      { key: "location", max: 200 },
+      { key: "description", max: ENTRY_TEXT_MAX, required: true },
+    ],
+    "event"
+  );
+  if (!eventsResult.ok) return json(eventsResult, 400);
+
+  const teamResult = parseEntryList(
+    body.team,
+    [
+      { key: "name", max: ENTRY_TITLE_MAX, required: true },
+      { key: "role", max: ENTRY_TITLE_MAX, required: true },
+      { key: "bio", max: ENTRY_TEXT_MAX },
+    ],
+    "team member"
+  );
+  if (!teamResult.ok) return json(teamResult, 400);
+
   const extraLinksRaw = Array.isArray(body.extraLinks) ? body.extraLinks : [];
   if (extraLinksRaw.length > EXTRA_LINKS_MAX) {
     return json({ ok: false, error: `no more than ${EXTRA_LINKS_MAX} extra links` }, 400);
@@ -141,13 +239,30 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     socialLinks,
     extraLinks,
     specialOffer,
+    specialOfferImageUrl,
+    blogPosts: blogResult.entries as any,
+    newsItems: newsResult.entries as any,
+    events: eventsResult.entries as any,
+    team: teamResult.entries as any,
   });
   if (!result.ok) return json(result, 500);
 
-  // Clean up any Blob files the owner/admin removed from the gallery/logo —
-  // best-effort, must never fail the save itself.
-  const removed = [...listing.imageUrls, listing.logoUrl].filter(
-    (url): url is string => !!url && !imageUrls.includes(url) && url !== logoUrl
+  // Clean up any Blob files the owner/admin removed — gallery, logo, special
+  // offer image, or an image that was on a blog/news/event/team entry that
+  // got edited or deleted. Best-effort, must never fail the save itself.
+  const keptEntryImages = [
+    ...blogResult.entries, ...newsResult.entries, ...eventsResult.entries, ...teamResult.entries,
+  ].map((e) => e.imageUrl).filter((u): u is string => !!u);
+  const previousEntryImages = [
+    ...(listing.blogPosts ?? []), ...(listing.newsItems ?? []), ...(listing.events ?? []), ...(listing.team ?? []),
+  ].map((e) => e.imageUrl).filter((u): u is string => !!u);
+  const removed = [...listing.imageUrls, listing.logoUrl, listing.specialOfferImageUrl, ...previousEntryImages].filter(
+    (url): url is string =>
+      !!url &&
+      !imageUrls.includes(url) &&
+      url !== logoUrl &&
+      url !== specialOfferImageUrl &&
+      !keptEntryImages.includes(url)
   );
   // Same explicit-token requirement as the upload routes — @vercel/blob
   // doesn't see import.meta.env's copy of BLOB_READ_WRITE_TOKEN.

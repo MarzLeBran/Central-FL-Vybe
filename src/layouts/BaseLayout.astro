@@ -15,6 +15,7 @@ import { site } from "../config/site";
 import SiteHeader from "../components/SiteHeader.astro";
 import DirectoryWidget from "../components/DirectoryWidget.astro";
 import FollowButtons from "../components/FollowButtons.astro";
+import Analytics from "@vercel/analytics/astro";
 
 interface Props {
   title: string;
@@ -33,6 +34,10 @@ const {
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, site.origin).href;
+
+// Optional, additive only — see docs/google-apis.md. Absent = no GA script
+// loads at all, nothing else on the page changes.
+const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID;
 
 // Channels render only once they have a url, so the site can ship before every
 // account exists. Fill them in at config/site.ts.
@@ -100,6 +105,22 @@ const channels = site.channels.filter((c) => c.url);
         ? "in"
         : "out";
     </script>
+    <Analytics />
+    {
+      gaId && (
+        <>
+          <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
+          <script define:vars={{ gaId }}>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+              dataLayer.push(arguments);
+            }
+            gtag("js", new Date());
+            gtag("config", gaId);
+          </script>
+        </>
+      )
+    }
   </head>
 
   <body class="min-h-screen">
@@ -137,7 +158,10 @@ const channels = site.channels.filter((c) => c.url);
           )
         }
 
-        <p class="meta mt-6">{site.towns.join(" &middot; ")}</p>
+        <p class="meta mt-6">{site.counties.map((c) => `${c.name} County`).join(" · ")}</p>
+        <a href="/grow" class="meta mt-4 inline-block font-bold text-signal hover:text-signal-sunk">
+          Want more than a listing? See what we can run for you &rarr;
+        </a>
         <p class="meta mt-8 text-ink-mute">
           &copy; {site.established} {site.name} &middot;
           <a href={`mailto:${site.contactEmail}`} class="hue-fg font-bold">

@@ -21,6 +21,11 @@ const known = new Set(Object.keys(await getListingsByCategory()));
 site.categoryGroups.flatMap((g) => g.categories).forEach((c) => known.add(c));
 const categories = [...known].sort();
 
+// Optional, additive only — see docs/google-apis.md. Absent = the address
+// field below is a plain, fully-working text input either way; this key
+// just adds a search-as-you-type assist on top of it.
+const placesApiKey = import.meta.env.PUBLIC_GOOGLE_PLACES_API_KEY;
+
 const requestedPlan = Astro.url.searchParams.get("plan");
 const initialPlan = ["free", "featured", "premium"].includes(requestedPlan ?? "") ? requestedPlan : "free";
 ---
@@ -120,14 +125,26 @@ const initialPlan = ["free", "featured", "premium"].includes(requestedPlan ?? ""
 
       <div>
         <label for="address" class="meta mb-1.5 block">Address</label>
+        {
+          placesApiKey && (
+            <div id="address-autocomplete-slot" class="mb-2" data-places-key={placesApiKey} />
+          )
+        }
         <input
           id="address"
           name="address"
           type="text"
           required
-          placeholder="Street, city, FL"
+          placeholder="Street, city, state, ZIP"
           class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
         />
+        {
+          placesApiKey && (
+            <p class="mt-1 text-xs text-ink-mute">
+              Search above to autofill, or just type the full address below — either works.
+            </p>
+          )
+        }
       </div>
 
       <div class="grid gap-5 sm:grid-cols-2">
@@ -241,5 +258,65 @@ const initialPlan = ["free", "featured", "premium"].includes(requestedPlan ?? ""
       el.textContent = ERRORS[error] ?? ERRORS.server;
       el.hidden = false;
     }
+  }
+</script>
+
+<script>
+  // Places Autocomplete assist — see docs/google-apis.md. Absent entirely
+  // when PUBLIC_GOOGLE_PLACES_API_KEY isn't set (no slot element, script
+  // no-ops immediately below). Deliberately additive, never a replacement:
+  // the real #address input stays a plain input the whole time, so typing
+  // manually — or this script failing/erroring for any reason — always
+  // still works. This uses the "Autocomplete (New)" element specifically
+  // (not the legacy google.maps.places.Autocomplete widget), since that's
+  // the one covered by Google's free monthly Essentials allowance —
+  // see docs/google-apis.md before changing this.
+  const slot = document.getElementById("address-autocomplete-slot");
+  const apiKey = slot?.dataset.placesKey;
+  const addressInput = document.getElementById("address") as HTMLInputElement | null;
+
+  if (slot && apiKey && addressInput) {
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&loading=async&callback=__initAddressAutocomplete`;
+    script.async = true;
+
+    (window as any).__initAddressAutocomplete = async () => {
+      try {
+        // No @types/google.maps in this repo — `any` throughout rather than
+        // a type reference that doesn't resolve.
+        const { PlaceAutocompleteElement } = await (window as any).google.maps.importLibrary(
+          "places"
+        );
+
+        const autocompleteEl = new PlaceAutocompleteElement({
+          // US-only fits this directory today; revisit if that ever changes.
+          includedRegionCodes: ["us"],
+        });
+        autocompleteEl.setAttribute(
+          "placeholder",
+          "Search for the business address…"
+        );
+        slot.appendChild(autocompleteEl);
+
+        autocompleteEl.addEventListener("gmp-select", async (e: any) => {
+          try {
+            const place = e.placePrediction.toPlace();
+            // Basic Data field (formattedAddress) — stays in the free/cheap
+            // tier this session pricing model assumes. Do not add
+            // Contact/Atmosphere fields here without re-checking cost.
+            await place.fetchFields({ fields: ["formattedAddress"] });
+            if (place.formattedAddress) addressInput.value = place.formattedAddress;
+          } catch {
+            // Selection failed for any reason — the plain input the visitor
+            // can still type into is right there, nothing else to do.
+          }
+        });
+      } catch {
+        // Script/library failed to load — slot just stays empty; the real
+        // address input below it was never touched, so the form still works.
+      }
+    };
+
+    document.head.appendChild(script);
   }
 </script>

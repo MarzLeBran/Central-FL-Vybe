@@ -76,6 +76,11 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Resul
       "metadata[listingId]": input.listingId,
       "metadata[plan]": input.plan,
       "metadata[activate]": input.activate ? "1" : "0",
+      // Adds an "Add promotion code" link on Stripe's hosted checkout page.
+      // The actual codes/discounts (e.g. a founders' rate) are created and
+      // managed entirely in the Stripe dashboard, not here — see
+      // docs/stripe-checkout.md.
+      allow_promotion_codes: "true",
     }),
   });
 

@@ -31,6 +31,50 @@ export function tierRank(tier: PlanTier): number {
   return tier === "premium" ? 0 : tier === "featured" ? 1 : 2;
 }
 
+// Per-listing content types (Featured/Premium perks: "Custom blog", "Add
+// events", "Share news stories", "Feature your team" in site.planFeatures).
+// Each lives on the business's OWN page (business/[slug].astro) — not a
+// site-wide "/blog" or "/events" hub; those are a separate, still-deferred
+// Layer 7 concept gated by site.exploreLinks' `enabled` flags.
+//
+// GHL has no sub-object/collection field type, so each list is stored as a
+// JSON string in one Multi-line custom field (see docs/ghl-layer-0.md) —
+// not the "one line per entry" convention socialLinks/extraLinks use,
+// because a post body can itself contain newlines. `id` is a client-generated
+// uuid, just a stable key for the editor's add/remove UI, not read anywhere
+// else.
+export interface BlogPost {
+  id: string;
+  title: string;
+  date: string;    // ISO yyyy-mm-dd, from a <input type="date">
+  body: string;     // plain text, not markdown — line breaks preserved, no formatting
+  imageUrl?: string;
+}
+export interface NewsItem {
+  id: string;
+  title: string;
+  date: string;
+  body: string;
+  imageUrl?: string;
+}
+export interface EventItem {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  location?: string;
+  description: string;
+  imageUrl?: string;
+}
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  bio?: string;
+  imageUrl?: string; // same field name as the other three entry types on
+                      // purpose — one shared editor/validator, not a special case
+}
+
 export interface Listing {
   id: string;                 // GHL contact id
   slug: string;               // URL key, e.g. "clean-lab-by-ez"  (custom field: listing_slug)
@@ -56,6 +100,12 @@ export interface Listing {
   extraLinks?: { label: string; url: string }[]; // extra_links — owner-curated link list (structured
                               // fields, not raw HTML/embeds — see the "no custom code" note in AGENTS.md)
   specialOffer?: string;      // special_offer — free-text coupon/promo blurb, owner-edited
+  specialOfferImageUrl?: string; // special_offer_image — optional photo for the deal card
+
+  blogPosts?: BlogPost[];     // blog_posts — JSON
+  newsItems?: NewsItem[];     // news_items — JSON
+  events?: EventItem[];       // events — JSON
+  team?: TeamMember[];        // team — JSON
 
   planTier: PlanTier;         // plan_tier  -> drives Featured styling + which chat widget
   claimStatus: ClaimStatus;   // claim_status
