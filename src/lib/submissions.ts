@@ -36,6 +36,8 @@ export interface AddBusinessInput extends ConsentMeta {
   businessName: string;
   category: string;
   address: string;
+  county?: string; // best-effort from countyForAddress() — same assignment
+                    // the batch importer does, now also live at self-signup
   phone: string;
   email: string;
   website?: string;
@@ -64,32 +66,41 @@ export async function submitClaim(input: ClaimInput): Promise<Result> {
   const token = requireEnv("GHL_PIT_TOKEN");
   if (!token) return { ok: false, error: "GHL_PIT_TOKEN is not set" };
 
-  const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
-    method: "PUT",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({
-      email: input.email,
-      phone: input.phone,
-      customFields: [
-        { key: "claim_status", fieldValue: "Pending" },
-        ...consentFields(input, submittedAt),
-      ],
-    }),
-  });
+  // Every network call below is wrapped: this function's whole contract is
+  // "returns a Result, never throws" (callers check `.ok`, none wrap this in
+  // try/catch) — a raw `fetch()` rejection (DNS/timeout/network drop, not
+  // just a bad HTTP status) would otherwise break that contract and crash
+  // the caller with an unhandled exception instead of a graceful "?error=server".
+  try {
+    const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
+      method: "PUT",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({
+        email: input.email,
+        phone: input.phone,
+        customFields: [
+          { key: "claim_status", fieldValue: "Pending" },
+          ...consentFields(input, submittedAt),
+        ],
+      }),
+    });
 
-  if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
+    if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
 
-  // Tags are additive via their own endpoint — a PUT with a `tags` array would
-  // OVERWRITE the contact's existing tags, silently un-tagging `business` and
-  // unpublishing the listing. opt_in_voice is the Layer 5 outbound-call gate:
-  // only added when the box was actually checked.
-  await addTags(
-    input.listingId,
-    input.tcpaConsent ? ["dir_claimed", "opt_in_voice"] : ["dir_claimed"],
-    token
-  );
+    // Tags are additive via their own endpoint — a PUT with a `tags` array would
+    // OVERWRITE the contact's existing tags, silently un-tagging `business` and
+    // unpublishing the listing. opt_in_voice is the Layer 5 outbound-call gate:
+    // only added when the box was actually checked.
+    await addTags(
+      input.listingId,
+      input.tcpaConsent ? ["dir_claimed", "opt_in_voice"] : ["dir_claimed"],
+      token
+    );
 
-  return { ok: true };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 /**
@@ -124,53 +135,58 @@ export async function submitAddBusiness(input: AddBusinessInput): Promise<AddBus
 
   const planLabel = input.plan === "premium" ? "Premium" : input.plan === "featured" ? "Featured" : "Free";
 
-  // NOTE: verified against the documented Update Contact body shape (which the
-  // GHL docs confirm accepts `key`-addressed customFields). The Create Contact
-  // endpoint's full request schema wasn't available to check field-for-field —
-  // this mirrors Update's shape on the assumption they match, which is typical
-  // for this API, but confirm against a live sandbox call before your first
-  // real submission.
-  const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
-    method: "POST",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({
-      locationId,
-      // THE FIRST-NAME TRAP: GHL requires a first name, and the directory
-      // renders that field as the listing title (scripts/import-listings.mjs
-      // has the full story). Always the business name, never an owner's name.
-      firstName: input.businessName,
-      email: input.email,
-      phone: input.phone,
-      website: input.website || undefined,
-      tags: input.plan === "free" ? ["business"] : [],
-      customFields: [
-        { key: "business_name", fieldValue: input.businessName },
-        { key: "business_category", fieldValue: input.category },
-        { key: "business_description", fieldValue: input.description ?? "" },
-        { key: "scraped_address", fieldValue: input.address },
-        { key: "scraped_phone", fieldValue: input.phone },
-        { key: "listing_slug", fieldValue: slugify(input.businessName) },
-        { key: "plan_tier", fieldValue: planLabel },
-        { key: "claim_status", fieldValue: "Pending" },
-        { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
-        ...consentFields(input, submittedAt),
-      ],
-    }),
-  });
+  try {
+    // NOTE: verified against the documented Update Contact body shape (which the
+    // GHL docs confirm accepts `key`-addressed customFields). The Create Contact
+    // endpoint's full request schema wasn't available to check field-for-field —
+    // this mirrors Update's shape on the assumption they match, which is typical
+    // for this API, but confirm against a live sandbox call before your first
+    // real submission.
+    const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
+      method: "POST",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({
+        locationId,
+        // THE FIRST-NAME TRAP: GHL requires a first name, and the directory
+        // renders that field as the listing title (scripts/import-listings.mjs
+        // has the full story). Always the business name, never an owner's name.
+        firstName: input.businessName,
+        email: input.email,
+        phone: input.phone,
+        website: input.website || undefined,
+        tags: input.plan === "free" ? ["business"] : [],
+        customFields: [
+          { key: "business_name", fieldValue: input.businessName },
+          { key: "business_category", fieldValue: input.category },
+          { key: "business_description", fieldValue: input.description ?? "" },
+          { key: "scraped_address", fieldValue: input.address },
+          { key: "county", fieldValue: input.county ?? "" },
+          { key: "scraped_phone", fieldValue: input.phone },
+          { key: "listing_slug", fieldValue: slugify(input.businessName) },
+          { key: "plan_tier", fieldValue: planLabel },
+          { key: "claim_status", fieldValue: "Pending" },
+          { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
+          ...consentFields(input, submittedAt),
+        ],
+      }),
+    });
 
-  if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
+    if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
 
-  // UNVERIFIED, flagged honestly (same caveat as the request body above): the
-  // Create Contact response shape wasn't checked against a live call. GHL
-  // typically wraps the created record as `{ contact: { id, ... } }` — falls
-  // back to a bare `id` in case it doesn't. Confirm on your first real paid
-  // signup; if this is wrong, the checkout session below gets created with a
-  // garbage listingId and the webhook silently can't find the contact.
-  const data = await res.json().catch(() => ({}));
-  const contactId = data.contact?.id ?? data.id;
-  if (!contactId) return { ok: false, error: "GHL create succeeded but returned no contact id" };
+    // UNVERIFIED, flagged honestly (same caveat as the request body above): the
+    // Create Contact response shape wasn't checked against a live call. GHL
+    // typically wraps the created record as `{ contact: { id, ... } }` — falls
+    // back to a bare `id` in case it doesn't. Confirm on your first real paid
+    // signup; if this is wrong, the checkout session below gets created with a
+    // garbage listingId and the webhook silently can't find the contact.
+    const data = await res.json().catch(() => ({}));
+    const contactId = data.contact?.id ?? data.id;
+    if (!contactId) return { ok: false, error: "GHL create succeeded but returned no contact id" };
 
-  return { ok: true, contactId };
+    return { ok: true, contactId };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 export interface AgencyInterestInput extends ConsentMeta {
@@ -204,26 +220,30 @@ export async function submitAgencyInterest(input: AgencyInterestInput): Promise<
   const locationId = requireEnv("GHL_LOCATION_ID");
   if (!token || !locationId) return { ok: false, error: "GHL env vars are not set" };
 
-  const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
-    method: "POST",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({
-      locationId,
-      firstName: input.contactName,
-      email: input.email,
-      phone: input.phone,
-      tags: ["agency_lead"],
-      customFields: [
-        { key: "agency_lead_business", fieldValue: input.businessName },
-        { key: "agency_interest", fieldValue: input.services.join(", ") },
-        { key: "agency_message", fieldValue: input.message ?? "" },
-        ...consentFields(input, submittedAt),
-      ],
-    }),
-  });
+  try {
+    const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
+      method: "POST",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({
+        locationId,
+        firstName: input.contactName,
+        email: input.email,
+        phone: input.phone,
+        tags: ["agency_lead"],
+        customFields: [
+          { key: "agency_lead_business", fieldValue: input.businessName },
+          { key: "agency_interest", fieldValue: input.services.join(", ") },
+          { key: "agency_message", fieldValue: input.message ?? "" },
+          ...consentFields(input, submittedAt),
+        ],
+      }),
+    });
 
-  if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
-  return { ok: true };
+    if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 /**
@@ -258,30 +278,34 @@ export async function applyPlanUpgrade(input: {
   const token = requireEnv("GHL_PIT_TOKEN");
   if (!token) return { ok: false, error: "GHL_PIT_TOKEN is not set" };
 
-  const planLabel = input.plan === "premium" ? "Premium" : "Featured";
-  const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
-    method: "PUT",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({
-      customFields: [{ key: "plan_tier", fieldValue: planLabel }],
-    }),
-  });
+  try {
+    const planLabel = input.plan === "premium" ? "Premium" : "Featured";
+    const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
+      method: "PUT",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({
+        customFields: [{ key: "plan_tier", fieldValue: planLabel }],
+      }),
+    });
 
-  if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
+    if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
 
-  // Best-effort: the plan_tier write above is the source of truth the app
-  // reads, so a tag hiccup here must never fail the upgrade itself. Removes
-  // the sibling tier's tag too, so a featured -> premium upgrade doesn't
-  // leave both tags on the contact.
-  const tagsToAdd = input.plan === "premium" ? ["plan_premium"] : ["plan_featured"];
-  if (input.activate) tagsToAdd.push("business");
-  const tagToRemove = input.plan === "premium" ? "plan_featured" : "plan_premium";
-  await Promise.allSettled([
-    addTags(input.listingId, tagsToAdd, token),
-    removeTags(input.listingId, [tagToRemove], token),
-  ]);
+    // Best-effort: the plan_tier write above is the source of truth the app
+    // reads, so a tag hiccup here must never fail the upgrade itself. Removes
+    // the sibling tier's tag too, so a featured -> premium upgrade doesn't
+    // leave both tags on the contact.
+    const tagsToAdd = input.plan === "premium" ? ["plan_premium"] : ["plan_featured"];
+    if (input.activate) tagsToAdd.push("business");
+    const tagToRemove = input.plan === "premium" ? "plan_featured" : "plan_premium";
+    await Promise.allSettled([
+      addTags(input.listingId, tagsToAdd, token),
+      removeTags(input.listingId, [tagToRemove], token),
+    ]);
 
-  return { ok: true };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 export interface ListingUpdateInput {
@@ -320,41 +344,45 @@ export async function submitListingUpdate(input: ListingUpdateInput): Promise<Re
   const token = requireEnv("GHL_PIT_TOKEN");
   if (!token) return { ok: false, error: "GHL_PIT_TOKEN is not set" };
 
-  const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
-    method: "PUT",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({
-      // Top-level, not custom fields — these are GHL's native contact fields,
-      // same ones submitClaim() sets and directory.ts falls back to when the
-      // scraped_* custom field is empty (see the "known data gap" note in
-      // AGENTS.md). Changing email here changes what this owner logs in with
-      // next time — ListingEditForm.astro warns about that in the UI.
-      email: input.email,
-      phone: input.phone,
-      website: input.website || undefined,
-      customFields: [
-        { key: "business_description", fieldValue: input.description },
-        { key: "image_urls", fieldValue: input.imageUrls.join(",") },
-        { key: "logo_url", fieldValue: input.logoUrl ?? "" },
-        { key: "scraped_address", fieldValue: input.address },
-        { key: "scraped_phone", fieldValue: input.phone },
-        { key: "website", fieldValue: input.website ?? "" },
-        { key: "youtube_url", fieldValue: input.youtubeUrl ?? "" },
-        { key: "booking_url", fieldValue: input.bookingUrl ?? "" },
-        { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
-        { key: "extra_links", fieldValue: serializeExtraLinks(input.extraLinks) },
-        { key: "special_offer", fieldValue: input.specialOffer ?? "" },
-        { key: "special_offer_image", fieldValue: input.specialOfferImageUrl ?? "" },
-        { key: "blog_posts", fieldValue: serializeJsonList(input.blogPosts) },
-        { key: "news_items", fieldValue: serializeJsonList(input.newsItems) },
-        { key: "events", fieldValue: serializeJsonList(input.events) },
-        { key: "team", fieldValue: serializeJsonList(input.team) },
-      ],
-    }),
-  });
+  try {
+    const res = await fetch(`https://services.leadconnectorhq.com/contacts/${input.listingId}`, {
+      method: "PUT",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({
+        // Top-level, not custom fields — these are GHL's native contact fields,
+        // same ones submitClaim() sets and directory.ts falls back to when the
+        // scraped_* custom field is empty (see the "known data gap" note in
+        // AGENTS.md). Changing email here changes what this owner logs in with
+        // next time — ListingEditForm.astro warns about that in the UI.
+        email: input.email,
+        phone: input.phone,
+        website: input.website || undefined,
+        customFields: [
+          { key: "business_description", fieldValue: input.description },
+          { key: "image_urls", fieldValue: input.imageUrls.join(",") },
+          { key: "logo_url", fieldValue: input.logoUrl ?? "" },
+          { key: "scraped_address", fieldValue: input.address },
+          { key: "scraped_phone", fieldValue: input.phone },
+          { key: "website", fieldValue: input.website ?? "" },
+          { key: "youtube_url", fieldValue: input.youtubeUrl ?? "" },
+          { key: "booking_url", fieldValue: input.bookingUrl ?? "" },
+          { key: "social_links", fieldValue: serializeSocialLinks(input.socialLinks) },
+          { key: "extra_links", fieldValue: serializeExtraLinks(input.extraLinks) },
+          { key: "special_offer", fieldValue: input.specialOffer ?? "" },
+          { key: "special_offer_image", fieldValue: input.specialOfferImageUrl ?? "" },
+          { key: "blog_posts", fieldValue: serializeJsonList(input.blogPosts) },
+          { key: "news_items", fieldValue: serializeJsonList(input.newsItems) },
+          { key: "events", fieldValue: serializeJsonList(input.events) },
+          { key: "team", fieldValue: serializeJsonList(input.team) },
+        ],
+      }),
+    });
 
-  if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
-  return { ok: true };
+    if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 // ── GHL helpers ──────────────────────────────────────────────────────────────

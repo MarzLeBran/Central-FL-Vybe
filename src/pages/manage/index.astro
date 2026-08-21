@@ -18,7 +18,22 @@ if (!session || session.kind !== "owner") {
   return Astro.redirect("/manage/login");
 }
 
-const listing = await getListingById(session.contactId);
+// A transient GHL hiccup must not be treated as "no longer eligible" — that
+// would delete a valid session cookie and force a real owner to click
+// through the magic-link flow again over a momentary blip. See the matching
+// fix on account/index.astro.
+let listing;
+let fetchFailed = false;
+try {
+  listing = await getListingById(session.contactId);
+} catch {
+  fetchFailed = true;
+}
+
+if (fetchFailed) {
+  return Astro.redirect("/manage/login?error=server");
+}
+
 // "pending" counts too, not just "claimed" — see the matching comment in
 // api/manage/request-link.ts.
 const eligible = !!listing && listing.claimStatus !== "unclaimed" && listing.planTier !== "free";

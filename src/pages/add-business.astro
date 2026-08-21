@@ -113,14 +113,66 @@ const initialPlan = ["free", "featured", "premium"].includes(requestedPlan ?? ""
         </datalist>
       </div>
 
-      <div>
-        <label for="description" class="meta mb-1.5 block">Description (optional)</label>
-        <textarea
-          id="description"
-          name="description"
-          rows={3}
-          class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
-        ></textarea>
+      <div class="space-y-5 border-2 border-rule bg-paper-sunk p-4">
+        <div>
+          <p class="meta font-bold">Tell us about the business</p>
+          <p class="mt-1 text-xs text-ink-soft">
+            Answer as many of these as you can — we'll write your listing's description
+            from them automatically, formatted and ready to go. Nothing here is required,
+            and you (or we) can always edit the result afterward.
+          </p>
+        </div>
+
+        <div>
+          <label for="intakeServices" class="meta mb-1.5 block">What products or services do you offer?</label>
+          <textarea
+            id="intakeServices"
+            name="intakeServices"
+            rows={2}
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          ></textarea>
+        </div>
+
+        <div>
+          <label for="intakeDifferentiators" class="meta mb-1.5 block">What makes you different from others in the area?</label>
+          <textarea
+            id="intakeDifferentiators"
+            name="intakeDifferentiators"
+            rows={2}
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          ></textarea>
+        </div>
+
+        <div>
+          <label for="intakeAudience" class="meta mb-1.5 block">Who do you mainly serve?</label>
+          <input
+            id="intakeAudience"
+            name="intakeAudience"
+            type="text"
+            placeholder="e.g. families, young professionals, dog owners"
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label for="intakeCredentials" class="meta mb-1.5 block">Any certifications, specialties, or years in business worth mentioning?</label>
+          <input
+            id="intakeCredentials"
+            name="intakeCredentials"
+            type="text"
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label for="intakeExtra" class="meta mb-1.5 block">Anything else you want customers to know?</label>
+          <textarea
+            id="intakeExtra"
+            name="intakeExtra"
+            rows={2}
+            class="w-full border-2 border-rule bg-paper px-4 py-2.5 text-sm focus:border-ink focus:outline-none"
+          ></textarea>
+        </div>
       </div>
 
       <div>

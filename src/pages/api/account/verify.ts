@@ -19,7 +19,12 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   const verified = verifyMagicLinkToken(token, "consumer");
   if (!verified) return redirect("/account/login?error=expired");
 
-  const consumer = await getConsumerById(verified.contactId);
+  let consumer;
+  try {
+    consumer = await getConsumerById(verified.contactId);
+  } catch {
+    return redirect("/account/login?error=server");
+  }
   if (!consumer) return redirect("/account/login?error=expired");
 
   const cookieOpts = { secure: import.meta.env.PROD, sameSite: "lax" as const, path: "/" };

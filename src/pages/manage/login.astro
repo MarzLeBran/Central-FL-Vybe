@@ -1,9 +1,15 @@
 ---
 // Owner self-serve login — email-only, passwordless magic link. Thin form
 // page + on-demand API route, same split as claim.astro/api/claim.ts.
-// Static-renderable: no listing lookup happens here (an email isn't known to
-// belong to a listing until request-link.ts checks — see its comment on why
-// this route never confirms or denies a match).
+// No listing lookup happens here (an email isn't known to belong to a
+// listing until request-link.ts checks — see its comment on why this route
+// never confirms or denies a match) — but it still needs to be on-demand,
+// not static: the sent/error banners read Astro.url.searchParams, which is
+// always empty at build time on a prerendered page, so a static version of
+// this page silently ignores the query string. Same bug fixed on
+// account/login.astro and account/register.astro.
+
+export const prerender = false;
 
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { site } from "../../config/site";
@@ -14,6 +20,7 @@ const sent = Astro.url.searchParams.get("sent") === "1";
 const ERRORS: Record<string, string> = {
   expired: "That link has expired. Request a new one below.",
   ineligible: "That listing isn't eligible for self-serve editing right now.",
+  server: "Something went wrong on our end — please try again in a moment.",
 };
 const errorMessage = errorCode ? ERRORS[errorCode] ?? null : null;
 ---

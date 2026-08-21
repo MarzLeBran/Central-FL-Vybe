@@ -42,11 +42,41 @@ export async function getListingByEmail(email?: string): Promise<Listing | null>
   return all.find((l) => l.email?.toLowerCase() === needle) ?? null;
 }
 
-/** Every listing on a paid plan — both featured and premium. Top tier first. */
+/** Every listing on a paid plan — both featured and premium. Top tier
+ *  always first. Within a tier: anyone with `homepagePriority` set is
+ *  pinned, lowest number first — that's how you guarantee specific paid
+ *  listings land in the homepage's capped "Featured this month" row.
+ *  Everyone else in that tier (no number set) fills the remaining slots in
+ *  a fresh random order EVERY TIME THIS RUNS — i.e. every rebuild — so a
+ *  large pool of paid listings naturally rotates through the visible slots
+ *  over time instead of the same handful showing forever just because
+ *  that's the order GHL happened to return them in. Set `homepage_priority`
+ *  by hand in GHL only on the ones you want pinned; leave it unset on
+ *  everyone else to let them rotate. */
 export async function getFeaturedListings(): Promise<Listing[]> {
-  return (await getListings())
-    .filter((l) => isPaidTier(l.planTier))
-    .sort((a, b) => Number(b.planTier === "premium") - Number(a.planTier === "premium"));
+  const paid = (await getListings()).filter((l) => isPaidTier(l.planTier));
+
+  const orderTier = (tier: "premium" | "featured"): Listing[] => {
+    const inTier = paid.filter((l) => l.planTier === tier);
+    const pinned = inTier
+      .filter((l) => l.homepagePriority !== undefined)
+      .sort((a, b) => a.homepagePriority! - b.homepagePriority!);
+    const rotating = shuffle(inTier.filter((l) => l.homepagePriority === undefined));
+    return [...pinned, ...rotating];
+  };
+
+  return [...orderTier("premium"), ...orderTier("featured")];
+}
+
+// Fisher-Yates — a `sort(() => Math.random() - 0.5)` one-liner is a well-known
+// anti-pattern that produces a biased, non-uniform shuffle; this doesn't.
+function shuffle<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 export async function getListingsByCategory(): Promise<Record<string, Listing[]>> {
@@ -174,10 +204,11 @@ function mapContactToListing(c: any, keyMap: Map<string, string>): Listing {
     team: parseJsonList<TeamMember>(cf("team")),
     planTier: normalizePlanTier(cf("plan_tier")),
     claimStatus: (cf("claim_status") ?? "unclaimed").toLowerCase() as Listing["claimStatus"],
+    homepagePriority: num(cf("homepage_priority")),
     email: c.email || undefined,
     aiContext: cf("ai_context"),
-    aiAgentEnabled: String(cf("ai_agent_enabled")).toLowerCase() === "true",
-    agencyClient: String(cf("agency_client")).toLowerCase() === "true",
+    aiAgentEnabled: isChecked(cf("ai_agent_enabled")),
+    agencyClient: isChecked(cf("agency_client")),
     clientLocationId: cf("client_location_id") || undefined,
     placeId: cf("google_place_id") || undefined,
   };
@@ -192,6 +223,16 @@ function normalizePlanTier(v: unknown): Listing["planTier"] {
 
 // ── tiny helpers ─────────────────────────────────────────────────────────────
 const num = (v: any) => (v == null || v === "" ? undefined : Number(v));
+
+// GHL CHECKBOX fields (ai_agent_enabled, agency_client) return the checked
+// picklist option's label ("Yes"), not a boolean or the string "true" — an
+// array like ["Yes"] from contacts/search, sometimes a bare string from other
+// endpoints. Was previously compared against the literal string "true",
+// which a real checked checkbox never produces (found via a live diagnostic:
+// both fields existed and were referenced in code, but neither could ever
+// actually read as true no matter how the box was set in GHL).
+const isChecked = (v: unknown) =>
+  Array.isArray(v) ? v.length > 0 : !!v && !/^(false|no|0)$/i.test(String(v));
 const parseList = (v: any) => (Array.isArray(v) ? v : (v ?? "").split(",").map((s: string) => s.trim()).filter(Boolean));
 
 // social_links is a Multi-line GHL field, one `network=https://url` per line —

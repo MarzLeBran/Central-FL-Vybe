@@ -58,36 +58,40 @@ export async function createCheckoutSession(input: CheckoutInput): Promise<Resul
     ? `${input.origin}/add-business?plan=${input.plan}&error=cancelled`
     : `${input.origin}/upgrade?t=${encodeURIComponent(input.listingId)}&plan=${input.plan}&error=cancelled`;
 
-  // Annual plans billed as one-time charges, not subscriptions — GHL workflows
-  // (Layer 3) own renewal reminders rather than Stripe auto-renewing a listing
-  // nobody re-confirmed. Revisit if that assumption changes.
-  const res = await fetch(`${STRIPE_API}/checkout/sessions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secretKey}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      mode: "payment",
-      "line_items[0][price]": priceId,
-      "line_items[0][quantity]": "1",
-      success_url: thanksUrl,
-      cancel_url: cancelUrl,
-      "metadata[listingId]": input.listingId,
-      "metadata[plan]": input.plan,
-      "metadata[activate]": input.activate ? "1" : "0",
-      // Adds an "Add promotion code" link on Stripe's hosted checkout page.
-      // The actual codes/discounts (e.g. a founders' rate) are created and
-      // managed entirely in the Stripe dashboard, not here — see
-      // docs/stripe-checkout.md.
-      allow_promotion_codes: "true",
-    }),
-  });
+  try {
+    // Annual plans billed as one-time charges, not subscriptions — GHL workflows
+    // (Layer 3) own renewal reminders rather than Stripe auto-renewing a listing
+    // nobody re-confirmed. Revisit if that assumption changes.
+    const res = await fetch(`${STRIPE_API}/checkout/sessions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        mode: "payment",
+        "line_items[0][price]": priceId,
+        "line_items[0][quantity]": "1",
+        success_url: thanksUrl,
+        cancel_url: cancelUrl,
+        "metadata[listingId]": input.listingId,
+        "metadata[plan]": input.plan,
+        "metadata[activate]": input.activate ? "1" : "0",
+        // Adds an "Add promotion code" link on Stripe's hosted checkout page.
+        // The actual codes/discounts (e.g. a founders' rate) are created and
+        // managed entirely in the Stripe dashboard, not here — see
+        // docs/stripe-checkout.md.
+        allow_promotion_codes: "true",
+      }),
+    });
 
-  if (!res.ok) return { ok: false, error: `Stripe session create failed: ${res.status}` };
-  const session = await res.json();
-  if (!session.url) return { ok: false, error: "Stripe session has no url" };
-  return { ok: true, url: session.url };
+    if (!res.ok) return { ok: false, error: `Stripe session create failed: ${res.status}` };
+    const session = await res.json();
+    if (!session.url) return { ok: false, error: "Stripe session has no url" };
+    return { ok: true, url: session.url };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 /**

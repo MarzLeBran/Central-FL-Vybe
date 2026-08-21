@@ -243,18 +243,32 @@ if (listing.rating && listing.reviewCount) {
             }
             <div class="min-w-0">
               <p class="truncate font-display font-bold">{listing.businessName}</p>
-              {
-                listing.website && (
-                  <a
-                    href={listing.website}
-                    target="_blank"
-                    rel="nofollow noopener"
-                    class="mt-1 inline-block bg-signal px-3 py-1.5 text-xs font-bold text-paper hover:bg-signal-sunk"
-                  >
-                    Visit website &rarr;
-                  </a>
-                )
-              }
+              <div class="mt-1 flex flex-wrap gap-2">
+                {
+                  listing.website && (
+                    <a
+                      href={listing.website}
+                      target="_blank"
+                      rel="nofollow noopener"
+                      class="inline-block bg-signal px-3 py-1.5 text-xs font-bold text-paper hover:bg-signal-sunk"
+                    >
+                      Visit website &rarr;
+                    </a>
+                  )
+                }
+                {
+                  listing.bookingUrl && (
+                    <a
+                      href={listing.bookingUrl}
+                      target="_blank"
+                      rel="nofollow noopener"
+                      class="hue-block inline-block px-3 py-1.5 text-xs font-bold"
+                    >
+                      Book now &rarr;
+                    </a>
+                  )
+                }
+              </div>
             </div>
           </div>
 

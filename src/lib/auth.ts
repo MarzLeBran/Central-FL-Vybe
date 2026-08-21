@@ -204,20 +204,29 @@ export async function sendMagicLinkEmail(
       ? { subject: "Manage your Central FL Vybe listing", body: "Click below to manage your listing." }
       : { subject: "Sign in to Central FL Vybe", body: "Click below to sign in to your account." };
 
-  const res = await fetch("https://services.leadconnectorhq.com/conversations/messages", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Version: GHL_VERSION,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      type: "Email",
-      contactId,
-      subject: copy.subject,
-      html: `<p>${copy.body} This link expires in 15 minutes.</p><p><a href="${url}">${url}</a></p>`,
-    }),
-  });
+  // Declared Promise<void> — every caller either awaits it bare or wraps it
+  // in its own try/catch expecting "fails quietly, never throws" (see the
+  // comment on the catch in api/account/register.ts). A bad HTTP response is
+  // already handled below without throwing; a raw fetch() rejection
+  // (DNS/timeout/network drop) would not be, so it's caught here too.
+  try {
+    const res = await fetch("https://services.leadconnectorhq.com/conversations/messages", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Version: GHL_VERSION,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "Email",
+        contactId,
+        subject: copy.subject,
+        html: `<p>${copy.body} This link expires in 15 minutes.</p><p><a href="${url}">${url}</a></p>`,
+      }),
+    });
 
-  if (!res.ok) console.error(`sendMagicLinkEmail: GHL send failed: ${res.status}`);
+    if (!res.ok) console.error(`sendMagicLinkEmail: GHL send failed: ${res.status}`);
+  } catch (err) {
+    console.error("sendMagicLinkEmail: network error:", err);
+  }
 }

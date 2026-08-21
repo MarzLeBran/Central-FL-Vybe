@@ -16,9 +16,19 @@ export const GET: APIRoute = async ({ cookies }) => {
     return new Response(JSON.stringify({ error: "not signed in" }), { status: 401 });
   }
 
-  const consumer = await getConsumerById(session.contactId);
-  return new Response(JSON.stringify({ slugs: consumer?.followedSlugs ?? [] }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  // A transient GHL hiccup must not crash the request the header script
+  // fires on every page load — degrade to "no favorites known right now"
+  // rather than a raw 500, same pattern as the rest of the on-demand routes.
+  try {
+    const consumer = await getConsumerById(session.contactId);
+    return new Response(JSON.stringify({ slugs: consumer?.followedSlugs ?? [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    return new Response(JSON.stringify({ slugs: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 };

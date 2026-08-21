@@ -24,8 +24,24 @@ interface Props {
 
 const { showSearch = true } = Astro.props;
 
-const byCategory = await getListingsByCategory();
-const hues = await categoryHues();
+// BaseLayout mounts this on EVERY page — a GHL hiccup here must degrade to
+// an empty nav (still a usable page: logo, search, static links all still
+// work), never crash the shared header and take the whole site down with it.
+// This was a real gap: every route-level try/catch fixed elsewhere in the
+// app was moot if the header itself could still blow up the page underneath it.
+let byCategory: Awaited<ReturnType<typeof getListingsByCategory>> = {};
+let hues: Awaited<ReturnType<typeof categoryHues>> = new Map();
+let byCounty: Awaited<ReturnType<typeof getListingsByCounty>> = {};
+try {
+  [byCategory, hues, byCounty] = await Promise.all([
+    getListingsByCategory(),
+    categoryHues(),
+    getListingsByCounty(),
+  ]);
+} catch {
+  // Swallow — the nav just renders with no categories/counties below.
+}
+
 const present = Object.keys(byCategory);
 
 const grouped = site.categoryGroups
@@ -47,7 +63,6 @@ const explore = site.exploreLinks.filter((l) => l.enabled);
 
 // Counties — the second browse axis. Only counties with listings appear, in the
 // configured order, so an empty county never renders a dead page.
-const byCounty = await getListingsByCounty();
 const counties = site.counties.filter((c) => byCounty[c.name]?.length);
 ---
 

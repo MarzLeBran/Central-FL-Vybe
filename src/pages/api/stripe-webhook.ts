@@ -40,7 +40,16 @@ export const POST: APIRoute = async ({ request }) => {
     const plan = session.metadata?.plan;
     const activate = session.metadata?.activate === "1";
     if (listingId && (plan === "featured" || plan === "premium")) {
-      await applyPlanUpgrade({ listingId, plan, activate });
+      const result = await applyPlanUpgrade({ listingId, plan, activate });
+      // A real payment was just collected — if the GHL write fails (network
+      // blip, GHL down), answering 200 here would tell Stripe "handled" and
+      // it would never retry, silently leaving a paying customer's listing
+      // un-upgraded with no record anywhere. 500 makes Stripe retry on its
+      // own schedule (up to 3 days) until this succeeds.
+      if (!result.ok) {
+        console.error(`[stripe-webhook] applyPlanUpgrade failed for ${listingId}: ${result.error}`);
+        return new Response(null, { status: 500 });
+      }
     }
   }
 

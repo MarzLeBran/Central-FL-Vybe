@@ -13,7 +13,12 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   const verified = verifyMagicLinkToken(token, "owner");
   if (!verified) return redirect("/manage/login?error=expired");
 
-  const listing = await getListingById(verified.contactId);
+  let listing;
+  try {
+    listing = await getListingById(verified.contactId);
+  } catch {
+    return redirect("/manage/login?error=server");
+  }
   // See the matching comment in request-link.ts — "pending" is eligible too.
   const eligible = listing && listing.claimStatus !== "unclaimed" && listing.planTier !== "free";
   if (!eligible) return redirect("/manage/login?error=ineligible");

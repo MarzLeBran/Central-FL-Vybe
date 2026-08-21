@@ -37,7 +37,12 @@ export const POST: APIRoute = async ({ request, clientAddress, redirect }) => {
   if (!ownerName || !email || !phone) return redirect(`${back}&error=missing`);
   if (!EMAIL_RE.test(email)) return redirect(`${back}&error=email`);
 
-  const listing = await getListingById(listingId);
+  let listing;
+  try {
+    listing = await getListingById(listingId);
+  } catch {
+    return redirect(`${back}&error=server`);
+  }
   if (!listing) return redirect(`${back}&error=notfound`);
   if (listing.claimStatus === "claimed") return redirect(`${back}&error=already`);
 

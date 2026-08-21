@@ -16,10 +16,22 @@ import type { APIRoute } from "astro";
 import { submitAddBusiness } from "../../lib/submissions";
 import { createCheckoutSession } from "../../lib/checkout";
 import { TCPA_CONSENT_VERSION } from "../../lib/consent";
+import { countyForAddress } from "../../lib/counties";
+import {
+  generateLiveAeoDescription,
+  assembleFallbackDescription,
+  fetchWebsiteExcerpt,
+} from "../../lib/ai-description";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isPlanTier = (v: string): v is "free" | "featured" | "premium" =>
   v === "free" || v === "featured" || v === "premium";
+
+// Same shape import-listings.mjs parses out of a formatted US address —
+// street, city, state, zip.
+function cityFromAddress(address: string): string | undefined {
+  return address.match(/,\s*([^,]+?),\s*[A-Z]{2}\s*\d{5}/)?.[1];
+}
 
 export const POST: APIRoute = async ({ request, clientAddress, redirect, url }) => {
   const data = await request.formData();
@@ -33,8 +45,14 @@ export const POST: APIRoute = async ({ request, clientAddress, redirect, url }) 
   const phone = String(data.get("phone") ?? "").trim();
   const email = String(data.get("email") ?? "").trim();
   const website = String(data.get("website") ?? "").trim();
-  const description = String(data.get("description") ?? "").trim();
   const ownerName = String(data.get("ownerName") ?? "").trim();
+  const intake = {
+    services: String(data.get("intakeServices") ?? "").trim() || undefined,
+    differentiators: String(data.get("intakeDifferentiators") ?? "").trim() || undefined,
+    audience: String(data.get("intakeAudience") ?? "").trim() || undefined,
+    credentials: String(data.get("intakeCredentials") ?? "").trim() || undefined,
+    extra: String(data.get("intakeExtra") ?? "").trim() || undefined,
+  };
   const tcpaConsent = data.get("tcpaConsent") === "on";
   const planRaw = String(data.get("plan") ?? "free").trim();
   const plan = isPlanTier(planRaw) ? planRaw : "free";
@@ -53,14 +71,52 @@ export const POST: APIRoute = async ({ request, clientAddress, redirect, url }) 
     if (!url.startsWith("https://")) return redirect("/add-business?error=social");
   }
 
+  const county = countyForAddress(address);
+  const city = cityFromAddress(address);
+  const location = [city, county && `${county} County`, "Florida"].filter(Boolean).join(", ");
+
+  // Best-effort real-world context beyond the five intake answers: actual
+  // text off their own website (never social platforms — see the note on
+  // IntakeFacts.socialNetworks for why those can't be scraped reliably),
+  // and just the fact that they listed a given social platform at all.
+  const websiteExcerpt = website ? await fetchWebsiteExcerpt(website) : undefined;
+  const socialNetworks = Object.keys(socialLinks);
+
+  const facts = {
+    businessName,
+    category,
+    location,
+    ...intake,
+    websiteExcerpt,
+    socialNetworks: socialNetworks.length ? socialNetworks : undefined,
+  };
+
+  // Generate the listing's description from all of the above — every
+  // signup, free or paid, per the site's value policy (a free listing is a
+  // real page, not a lesser one). Never blocks the submission: no API key,
+  // or the call fails for any reason, falls back to plainly assembling
+  // whatever was actually typed rather than leaving the listing blank.
+  const anthropicKey = import.meta.env.ANTHROPIC_API_KEY;
+  let description: string;
+  if (anthropicKey) {
+    try {
+      description = await generateLiveAeoDescription(anthropicKey, facts);
+    } catch {
+      description = assembleFallbackDescription(facts);
+    }
+  } else {
+    description = assembleFallbackDescription(facts);
+  }
+
   const result = await submitAddBusiness({
     businessName,
     category,
     address,
+    county,
     phone,
     email,
     website: website || undefined,
-    description: description || undefined,
+    description,
     ownerName: ownerName || undefined,
     socialLinks: Object.keys(socialLinks).length ? socialLinks : undefined,
     tcpaConsent,

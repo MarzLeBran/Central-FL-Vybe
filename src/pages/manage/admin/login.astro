@@ -3,6 +3,12 @@
 // your team, not a multi-admin system; no users table, per golden rule 1),
 // checked against ADMIN_PASSWORD. Grants edit access to ANY listing,
 // regardless of claim/tier status — see src/lib/auth.ts's admin session.
+//
+// On-demand, not static — same reason as account/login.astro: the wrong-
+// password banner reads Astro.url.searchParams, always empty at build time
+// on a prerendered page.
+
+export const prerender = false;
 
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import { site } from "../../../config/site";

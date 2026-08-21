@@ -33,7 +33,17 @@ export interface RegisterConsumerInput extends ConsentMeta {
 export async function registerConsumer(
   input: RegisterConsumerInput
 ): Promise<{ ok: true; contactId: string } | { ok: false; error: string }> {
-  const existing = await getConsumerByEmail(input.email);
+  // getConsumerByEmail is a "read" helper (throws on a GHL failure, same
+  // family as getListingById/getConsumerById in directory.ts/consumers.ts) —
+  // this function's own contract is "returns a Result, never throws" (its
+  // one caller, api/account/register.ts, doesn't wrap it in try/catch), so a
+  // transient GHL hiccup here must be caught, not left to propagate.
+  let existing;
+  try {
+    existing = await getConsumerByEmail(input.email);
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
   if (existing) return { ok: true, contactId: existing.id };
 
   const submittedAt = new Date().toISOString();
@@ -57,25 +67,29 @@ export async function registerConsumer(
   const locationId = requireEnv("GHL_LOCATION_ID");
   if (!token || !locationId) return { ok: false, error: "GHL env vars are not set" };
 
-  const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
-    method: "POST",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({
-      locationId,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      email: input.email,
-      phone: input.phone,
-      tags: ["consumer"],
-      customFields: consentFields(input, submittedAt),
-    }),
-  });
+  try {
+    const res = await fetch("https://services.leadconnectorhq.com/contacts/", {
+      method: "POST",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({
+        locationId,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        phone: input.phone,
+        tags: ["consumer"],
+        customFields: consentFields(input, submittedAt),
+      }),
+    });
 
-  if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
-  const data = await res.json();
-  const contactId = data.contact?.id ?? data.id;
-  if (!contactId) return { ok: false, error: "GHL create response had no contact id" };
-  return { ok: true, contactId };
+    if (!res.ok) return { ok: false, error: `GHL create failed: ${res.status}` };
+    const data = await res.json();
+    const contactId = data.contact?.id ?? data.id;
+    if (!contactId) return { ok: false, error: "GHL create response had no contact id" };
+    return { ok: true, contactId };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 export async function setFollowedListings(contactId: string, slugs: string[]): Promise<Result> {
@@ -104,14 +118,18 @@ async function putCustomField(contactId: string, key: string, fieldValue: string
   const token = requireEnv("GHL_PIT_TOKEN");
   if (!token) return { ok: false, error: "GHL_PIT_TOKEN is not set" };
 
-  const res = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
-    method: "PUT",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({ customFields: [{ key, fieldValue }] }),
-  });
+  try {
+    const res = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
+      method: "PUT",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({ customFields: [{ key, fieldValue }] }),
+    });
 
-  if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
-  return { ok: true };
+    if (!res.ok) return { ok: false, error: `GHL update failed: ${res.status}` };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `network error: ${(err as Error).message}` };
+  }
 }
 
 function ghlHeaders(token: string) {

@@ -2,15 +2,31 @@
 // Consumer sign-in — email-only, passwordless magic link. Separate from
 // /manage/login (business owners) — a different identity system entirely,
 // see src/lib/consumers.ts.
+//
+// On-demand, not static: the sent/registered/error banners are driven by
+// Astro.url.searchParams, which is always empty at build time on a
+// prerendered page — a static version of this page silently ignores the
+// query string and always renders the bare empty form no matter what's in
+// the URL. That was a real, previously-shipped bug (registration and login
+// both looked like they "did nothing" even when they'd worked).
+
+export const prerender = false;
 
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { site } from "../../config/site";
 
 const errorCode = Astro.url.searchParams.get("error");
 const sent = Astro.url.searchParams.get("sent") === "1";
+// A distinct state from plain "sent" — someone arriving here right after
+// registering should see an unambiguous "you're in" confirmation, not the
+// same hedged "if that email is on file" copy a login attempt gets (that
+// copy reading as "nothing happened" right after registering is exactly
+// the bug this fixes).
+const registered = Astro.url.searchParams.get("registered") === "1";
 
 const ERRORS: Record<string, string> = {
   expired: "That link has expired. Request a new one below.",
+  server: "Something went wrong on our end — please try again in a moment.",
 };
 const errorMessage = errorCode ? ERRORS[errorCode] ?? null : null;
 ---
@@ -25,19 +41,30 @@ const errorMessage = errorCode ? ERRORS[errorCode] ?? null : null;
     </div>
 
     {
-      sent ? (
+      sent && !registered ? (
         <p class="mt-8 border-2 border-ink bg-paper-sunk px-4 py-3 text-sm font-semibold text-ink">
           If that email is on file, a sign-in link is on its way. It expires in 15 minutes.
         </p>
       ) : (
         <>
+          {registered && (
+            <div class="hue-block mt-8 border-2 border-rule px-4 py-4">
+              <p class="font-display text-lg font-extrabold">You're registered! &#127881;</p>
+              <p class="mt-1.5 text-sm">
+                Check your email for a sign-in link to finish logging in — it expires in 15
+                minutes. Didn't get it after a few minutes? Enter your email below to request a
+                new one.
+              </p>
+            </div>
+          )}
+
           {errorMessage && (
             <p class="mt-6 border-2 border-signal bg-signal/10 px-4 py-3 text-sm font-semibold text-signal-sunk">
               {errorMessage}
             </p>
           )}
 
-          <form method="POST" action="/api/account/request-link" class="mt-8 space-y-5">
+          <form method="POST" action="/api/account/request-link" class:list={[registered ? "mt-6" : "mt-8", "space-y-5"]}>
             <input
               type="text"
               name="hp"
@@ -66,9 +93,11 @@ const errorMessage = errorCode ? ERRORS[errorCode] ?? null : null;
             </button>
           </form>
 
-          <p class="mt-6 text-sm text-ink-soft">
-            No account yet? <a href="/account/register" class="hue-fg font-bold">Register &rarr;</a>
-          </p>
+          {!registered && (
+            <p class="mt-6 text-sm text-ink-soft">
+              No account yet? <a href="/account/register" class="hue-fg font-bold">Register &rarr;</a>
+            </p>
+          )}
         </>
       )
     }

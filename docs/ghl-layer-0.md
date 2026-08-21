@@ -76,6 +76,7 @@ anything human-readable.
 | `ai_agent_enabled` | Checkbox | `aiAgentEnabled` — Premium alone does NOT show the "Ask this business" card/widget; this must also be checked, by hand, once a real agent has actually been built for that specific business. Defaults unchecked/false on every listing, including new Premium ones. See `hasListingAgent()` in `src/types/listing.ts`. |
 | `agency_client` | Checkbox | `agencyClient` |
 | `client_location_id` | Text | `clientLocationId` — their own sub-account, once they're an agency client |
+| `homepage_priority` | Number | `homepagePriority` — **internal-only, set by hand in GHL, never exposed in `/manage` or `/manage/admin`.** With more paid listings than the homepage's capped "Featured this month" row can show, this is how you actually pick which ones land there — lower number shows first *within the same plan tier* (a Premium listing with no priority set still outranks any Featured listing, priority or not — see `getFeaturedListings()`). Leave unset for everyone you don't care to hand-curate; they sort after anyone who has a number, in whatever order GHL happens to return them. |
 | `tcpa_consent` | Checkbox | Written on every claim/add-business submission, consented or not |
 | `tcpa_consent_ts` | Date/Text | When they answered the consent checkbox |
 | `tcpa_consent_ip` | Text | IP the submission came from |

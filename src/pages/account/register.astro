@@ -3,6 +3,12 @@
 // Same fields/consent mechanism as the business side (src/lib/consent.ts),
 // even though nothing here triggers SMS/voice outreach to consumers today —
 // kept consistent rather than inventing a second consent flow.
+//
+// On-demand, not static — same reason as account/login.astro: the error
+// banner is driven by Astro.url.searchParams, which is always empty on a
+// prerendered page.
+
+export const prerender = false;
 
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { site } from "../../config/site";

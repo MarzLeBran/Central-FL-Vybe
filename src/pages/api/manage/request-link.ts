@@ -20,16 +20,22 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   const email = String(data.get("email") ?? "").trim();
   if (!email) return redirect("/manage/login?sent=1");
 
-  const listing = await getListingByEmail(email);
-  // "pending" counts too, not just "claimed" — a paid /add-business signup
-  // is Pending (awaiting your human follow-up) but already paying, so they
-  // get self-serve access right away rather than waiting on manual review.
-  const eligible = listing && listing.claimStatus !== "unclaimed" && listing.planTier !== "free";
+  // GHL being unreachable/rate-limited must not crash the request with a
+  // raw 500 — see the matching comment in api/account/request-link.ts.
+  try {
+    const listing = await getListingByEmail(email);
+    // "pending" counts too, not just "claimed" — a paid /add-business signup
+    // is Pending (awaiting your human follow-up) but already paying, so they
+    // get self-serve access right away rather than waiting on manual review.
+    const eligible = listing && listing.claimStatus !== "unclaimed" && listing.planTier !== "free";
 
-  if (eligible) {
-    const token = createMagicLinkToken(listing.id, "owner");
-    const verifyUrl = `${url.origin}/api/manage/verify?token=${encodeURIComponent(token)}`;
-    await sendMagicLinkEmail(listing.id, email, verifyUrl, "owner");
+    if (eligible) {
+      const token = createMagicLinkToken(listing.id, "owner");
+      const verifyUrl = `${url.origin}/api/manage/verify?token=${encodeURIComponent(token)}`;
+      await sendMagicLinkEmail(listing.id, email, verifyUrl, "owner");
+    }
+  } catch {
+    return redirect("/manage/login?error=server");
   }
 
   return redirect("/manage/login?sent=1");

@@ -23,7 +23,12 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
 
   if (!listingId || !isUpgradeTier(plan)) return redirect("/listings");
 
-  const listing = await getListingById(listingId);
+  let listing;
+  try {
+    listing = await getListingById(listingId);
+  } catch {
+    return redirect(`${back}&error=server`);
+  }
   if (!listing) return redirect("/listings");
   if (listing.claimStatus !== "claimed") return redirect(`/claim?t=${listing.id}`);
   if (tierRank(listing.planTier) <= tierRank(plan as PlanTier)) {

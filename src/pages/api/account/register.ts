@@ -39,10 +39,20 @@ export const POST: APIRoute = async ({ request, clientAddress, redirect }) => {
 
   if (!result.ok) return redirect("/account/register?error=server");
 
-  const token = createMagicLinkToken(result.contactId, "consumer");
-  const url = new URL(request.url);
-  const verifyUrl = `${url.origin}/api/account/verify?token=${encodeURIComponent(token)}`;
-  await sendMagicLinkEmail(result.contactId, email, verifyUrl, "consumer");
+  // The account is already created at this point — a failure sending the
+  // magic-link email must not read as "registration failed" (it didn't) or
+  // crash with a 500 (same unguarded-GHL-call class just fixed in
+  // api/account+manage/request-link.ts and verify.ts). Land them on the
+  // clear "you're registered" state either way; worst case they use "Log in"
+  // afterward to get a fresh link once email delivery is sorted.
+  try {
+    const token = createMagicLinkToken(result.contactId, "consumer");
+    const url = new URL(request.url);
+    const verifyUrl = `${url.origin}/api/account/verify?token=${encodeURIComponent(token)}`;
+    await sendMagicLinkEmail(result.contactId, email, verifyUrl, "consumer");
+  } catch {
+    // swallow — see comment above
+  }
 
-  return redirect("/account/login?sent=1");
+  return redirect("/account/login?registered=1");
 };

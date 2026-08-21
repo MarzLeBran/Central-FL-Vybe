@@ -26,7 +26,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const follow = !!body?.follow;
   if (!slug) return new Response(JSON.stringify({ ok: false, error: "missing slug" }), { status: 400 });
 
-  const consumer = await getConsumerById(session.contactId);
+  let consumer;
+  try {
+    consumer = await getConsumerById(session.contactId);
+  } catch {
+    return new Response(JSON.stringify({ ok: false, error: "server" }), { status: 500 });
+  }
   if (!consumer) return new Response(JSON.stringify({ ok: false, error: "account not found" }), { status: 404 });
 
   const current = new Set(consumer.followedSlugs);

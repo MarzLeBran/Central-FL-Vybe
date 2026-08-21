@@ -85,7 +85,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   // listingId is ignored in favor of the session's own contact id. Admin
   // sessions may edit any listing that actually exists.
   const listingId = session.kind === "owner" ? session.contactId : String(body.listingId ?? "");
-  const listing = await getListingById(listingId);
+  let listing;
+  try {
+    listing = await getListingById(listingId);
+  } catch {
+    return json({ ok: false, error: "server" }, 500);
+  }
   if (!listing) return json({ ok: false, error: "listing not found" }, 404);
 
   // Defense in depth: re-check the claim/tier gate for owner sessions even

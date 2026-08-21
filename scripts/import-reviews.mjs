@@ -114,20 +114,25 @@ async function main() {
 
 // ── Google Places ────────────────────────────────────────────────────────────
 
+// Places API (New) — same product scripts/find-businesses.mjs and the live
+// Places Autocomplete already use, not the legacy `maps/api/place/details`
+// endpoint this used to call. That legacy endpoint is a SEPARATE Google
+// Cloud API that has to be independently enabled — REQUEST_DENIED here
+// almost always means only the New API is turned on, which is the one this
+// project already standardizes on everywhere else.
 async function fetchPlaceDetails(placeId) {
-  const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
-  url.searchParams.set("place_id", placeId);
-  url.searchParams.set("fields", "rating,user_ratings_total");
-  url.searchParams.set("key", GOOGLE_PLACES_API_KEY);
-
-  const res = await fetch(url);
+  const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+    headers: {
+      "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+      "X-Goog-FieldMask": "rating,userRatingCount",
+    },
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  if (data.status !== "OK") throw new Error(data.status);
 
   return {
-    rating: data.result?.rating,
-    reviewCount: data.result?.user_ratings_total,
+    rating: data.rating,
+    reviewCount: data.userRatingCount,
   };
 }
 
@@ -150,24 +155,42 @@ async function loadFromGHL() {
   const locationId = requireEnv("GHL_LOCATION_ID");
 
   const keyMap = await fetchCustomFieldKeyMap(token, locationId);
-  const res = await fetch("https://services.leadconnectorhq.com/contacts/search", {
-    method: "POST",
-    headers: ghlHeaders(token),
-    body: JSON.stringify({
-      locationId,
-      pageLimit: 100,
-      filters: [{ field: "tags", operator: "contains", value: "business" }],
-    }),
-  });
-  if (!res.ok) throw new Error(`GHL fetch failed: ${res.status}`);
-  const data = await res.json();
+
+  // contacts/search caps at 100/page — paginate with searchAfter until a
+  // short page signals there's nothing left. Same fix already applied in
+  // src/lib/directory.ts; this script has its own separate copy of the
+  // fetch logic (no build step, can't import that module directly) and had
+  // never gotten the same fix, so it silently only ever saw the first 100
+  // of 140 contacts.
+  const pageLimit = 100;
+  const contacts = [];
+  let searchAfter;
+  while (true) {
+    const res = await fetch("https://services.leadconnectorhq.com/contacts/search", {
+      method: "POST",
+      headers: ghlHeaders(token),
+      body: JSON.stringify({
+        locationId,
+        pageLimit,
+        filters: [{ field: "tags", operator: "contains", value: "business" }],
+        ...(searchAfter ? { searchAfter } : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`GHL fetch failed: ${res.status}`);
+    const data = await res.json();
+    const page = data.contacts ?? [];
+    contacts.push(...page);
+    if (page.length < pageLimit) break;
+    const last = page[page.length - 1];
+    searchAfter = [Date.parse(last.dateAdded), last.id];
+  }
 
   const cf = (contact, key) => {
     const field = (contact.customFields ?? []).find((f) => f.key === key || keyMap.get(f.id) === key);
     return field?.value;
   };
 
-  const listings = (data.contacts ?? []).map((c) => ({
+  const listings = contacts.map((c) => ({
     id: c.id,
     businessName: cf(c, "business_name") ?? "",
     planTier: normalizePlanTier(cf(c, "plan_tier")),
@@ -203,7 +226,15 @@ async function fetchCustomFieldKeyMap(token, locationId) {
   if (!res.ok) throw new Error(`GHL customFields fetch failed: ${res.status}`);
   const data = await res.json();
   const map = new Map();
-  for (const f of data.customFields ?? []) map.set(f.id, f.key ?? f.fieldKey);
+  // fieldKey comes back namespaced ("contact.plan_tier"), never as a bare
+  // `key` — same fix already applied in src/lib/directory.ts's version of
+  // this function. Without stripping the prefix, every cf() lookup below
+  // silently fails to match anything at all, which is what was actually
+  // happening here — not just the pagination bug fixed above.
+  for (const f of data.customFields ?? []) {
+    const key = f.key ?? f.fieldKey;
+    map.set(f.id, key?.startsWith("contact.") ? key.slice("contact.".length) : key);
+  }
   return map;
 }
 

@@ -109,6 +109,12 @@ export interface Listing {
 
   planTier: PlanTier;         // plan_tier  -> drives Featured styling + which chat widget
   claimStatus: ClaimStatus;   // claim_status
+  homepagePriority?: number;  // homepage_priority — internal-only, GHL-set-by-hand (never
+                              // exposed in /manage or /manage/admin — a paid customer ranking
+                              // themselves above other paid customers would defeat the point).
+                              // Lower shows first on the homepage's "Featured this month" row
+                              // WITHIN the same plan tier; unset listings sort after any that
+                              // have a number set. See tierRank()/getFeaturedListings().
   email?: string;             // GHL's native contact email — set at claim time; used to
                               // look up a listing for owner self-serve login (src/lib/auth.ts)
 
